@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-body: "DM Sans", sans-serif;
+    --font-display: "DM Serif Display", serif;
+    --font-mono: "JetBrains Mono", monospace;
+  }
+
+  body {
+    @apply min-h-screen;
+  }
+}
+
+@layer components {
+  .heading-display {
+    @apply font-display text-2xl text-text-primary;
+  }
+
+  .card {
+    @apply bg-white rounded-card shadow-card p-4;
+  }
+}
