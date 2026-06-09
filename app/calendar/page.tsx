@@ -95,37 +95,41 @@ export default function PublicCalendarPage() {
     const dayOfWeek = new Date(selectedDate + "T00:00:00").getDay();
     const daySlots = slots.filter((s) => s.day_of_week === dayOfWeek);
 
-    // Group sessions by their time slot OR by their start_time if no matching slot
-    // First: sessions matched to slots
-    const matchedSessionIds = new Set<string>();
+    // Build display: show all regular slots (with their sessions matched by time)
+    // Plus any extra sessions not covered by a slot's time range
+    const coveredSessionIds = new Set<string>();
+
     const slotData = daySlots.map((slot) => {
-      const slotSessions = selectedSessions.filter((s) => s.slot_id === slot.id);
-      slotSessions.forEach((s) => matchedSessionIds.add(s.id));
-      return { ...slot, slotSessions };
+      // Match sessions to slot by EITHER slot_id OR matching time on this date
+      const slotSessions = selectedSessions.filter((s) => 
+        s.slot_id === slot.id || (s.start_time === slot.start_time && s.end_time === slot.end_time)
+      );
+      slotSessions.forEach((s) => coveredSessionIds.add(s.id));
+      return { ...slot, slotSessions, isVirtual: false };
     });
 
-    // Second: sessions not matched to any slot (edited to this day but slot_id is from another day)
-    const unmatchedSessions = selectedSessions.filter((s) => !matchedSessionIds.has(s.id));
+    // Sessions not covered by any regular slot
+    const uncoveredSessions = selectedSessions.filter((s) => !coveredSessionIds.has(s.id));
 
-    // Create virtual "slots" for unmatched sessions grouped by time
+    // Group uncovered by time
     const timeGroups: Record<string, any[]> = {};
-    unmatchedSessions.forEach((s) => {
+    uncoveredSessions.forEach((s) => {
       const key = `${s.start_time}-${s.end_time}`;
       if (!timeGroups[key]) timeGroups[key] = [];
       timeGroups[key].push(s);
     });
 
-    const virtualSlots = Object.entries(timeGroups).map(([key, sessions]) => ({
+    const virtualSlots = Object.entries(timeGroups).map(([key, groupSessions]) => ({
       id: `virtual-${key}`,
-      start_time: sessions[0].start_time,
-      end_time: sessions[0].end_time,
-      max_capacity: 7,
+      start_time: groupSessions[0].start_time,
+      end_time: groupSessions[0].end_time,
+      max_capacity: groupSessions.length,
       is_active: true,
-      slotSessions: sessions,
+      slotSessions: groupSessions,
       isVirtual: true,
     }));
 
-    return [...slotData.map((s) => ({ ...s, isVirtual: false })), ...virtualSlots];
+    return [...slotData, ...virtualSlots];
   }, [selectedDate, slots, selectedSessions]);
 
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
