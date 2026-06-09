@@ -25,6 +25,7 @@ const item = {
 
 export default function AdminDashboard() {
   const [todaySessions, setTodaySessions] = useState<any[]>([]);
+  const [overdueSessions, setOverdueSessions] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [unpaidPackages, setUnpaidPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,13 +40,20 @@ export default function AdminDashboard() {
       const supabase = createClient();
       const today = new Date().toISOString().split("T")[0];
 
-      const [sessionsRes, requestsRes, packagesRes] = await Promise.all([
+      const [sessionsRes, overdueRes, requestsRes, packagesRes] = await Promise.all([
         supabase
           .from("sessions")
           .select("*, students(full_name)")
           .eq("scheduled_date", today)
           .neq("status", "rescheduled")
           .order("start_time", { ascending: true }),
+        supabase
+          .from("sessions")
+          .select("*, students(full_name)")
+          .lt("scheduled_date", today)
+          .eq("status", "scheduled")
+          .order("scheduled_date", { ascending: false })
+          .limit(20),
         supabase
           .from("reschedule_requests")
           .select("*, students(full_name), sessions(scheduled_date, start_time, end_time, slot_id)")
@@ -60,6 +68,7 @@ export default function AdminDashboard() {
       ]);
 
       setTodaySessions(sessionsRes.data ?? []);
+      setOverdueSessions(overdueRes.data ?? []);
       setPendingRequests(requestsRes.data ?? []);
       setUnpaidPackages(packagesRes.data ?? []);
     } catch {
@@ -218,6 +227,51 @@ export default function AdminDashboard() {
             )}
           </motion.div>
         </section>
+
+        {/* Sesi Belum Diabsen (Overdue) */}
+        {overdueSessions.length > 0 && (
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <XCircle size={16} className="text-rose-400" />
+              <h2 className="text-sm font-bold text-gray-700">
+                Belum Diabsen ({overdueSessions.length})
+              </h2>
+            </div>
+            <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-3">
+              {overdueSessions.map((session) => (
+                <motion.div key={session.id} variants={item} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={session.students?.full_name ?? ""} size="sm" />
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{session.students?.full_name}</p>
+                        <p className="text-xs text-gray-400 font-medium">
+                          {new Date(session.scheduled_date + "T00:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })} · {formatTime(session.start_time)} – {formatTime(session.end_time)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleMarkAttendance(session.id, "attended")}
+                        disabled={actionLoading === session.id}
+                        className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                      >
+                        <CheckCircle size={18} className="text-emerald-500" />
+                      </button>
+                      <button
+                        onClick={() => handleMarkAttendance(session.id, "absent")}
+                        disabled={actionLoading === session.id}
+                        className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                      >
+                        <XCircle size={18} className="text-rose-400" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </section>
+        )}
 
         {/* Request Pending */}
         <section>

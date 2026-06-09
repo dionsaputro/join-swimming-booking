@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Plus, RefreshCw, Check, Pencil, Trash2, Lock } from "lucide-react";
+import { ArrowLeft, Copy, Plus, RefreshCw, Check, Pencil, Trash2, Lock, CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import PageTransition from "@/components/layout/PageTransition";
@@ -17,6 +17,7 @@ import { createPackage, convertTrialToPackage } from "@/lib/actions/packages";
 import { updateStudent, deleteStudent } from "@/lib/actions/students";
 import { createPrivatePackage } from "@/lib/actions/private-sessions";
 import { updateSession } from "@/lib/actions/sessions";
+import { markAttendance } from "@/lib/actions/attendance";
 import { formatTime } from "@/lib/utils";
 import { LEVEL_LABELS, LEVELS, SESSION_STATUS, DAYS_OF_WEEK } from "@/lib/constants";
 
@@ -39,6 +40,7 @@ export default function StudentDetailPage() {
   const [slots, setSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Add Package Modal
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -338,6 +340,18 @@ export default function StudentDetailPage() {
     }
   }
 
+  async function handleSessionAttendance(sessionId: string, status: "attended" | "absent") {
+    setActionLoading(sessionId);
+    try {
+      await markAttendance(sessionId, status);
+      fetchData();
+    } catch {
+      // silent
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   if (loading) {
     return (
       <PageTransition>
@@ -478,42 +492,69 @@ export default function StudentDetailPage() {
             </div>
           ) : (
             <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
-              {sessions.map((session) => (
-                <motion.div
-                  key={session.id}
-                  variants={item}
-                  className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between ${
-                    session.status === "scheduled" ? "cursor-pointer hover:shadow-md transition-shadow" : ""
-                  }`}
-                  onClick={() => session.status === "scheduled" && openEditSession(session)}
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-800">
-                        {new Date(session.scheduled_date + "T00:00:00").toLocaleDateString("id-ID", {
-                          weekday: "short",
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </p>
-                      {!session.slot_id && (
-                        <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">
-                          Private
-                        </span>
-                      )}
-                      {session.status === "scheduled" && (
-                        <Pencil size={12} className="text-gray-300" />
+              {sessions.map((session) => {
+                const today = new Date().toISOString().split("T")[0];
+                const isPast = session.scheduled_date < today;
+                const canMarkAttendance = session.status === "scheduled" && isPast;
+                const canEdit = session.status === "scheduled";
+
+                return (
+                  <motion.div
+                    key={session.id}
+                    variants={item}
+                    className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 ${
+                      canEdit ? "cursor-pointer hover:shadow-md transition-shadow" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between" onClick={() => canEdit && openEditSession(session)}>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-gray-800">
+                            {new Date(session.scheduled_date + "T00:00:00").toLocaleDateString("id-ID", {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </p>
+                          {!session.slot_id && (
+                            <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">
+                              Private
+                            </span>
+                          )}
+                          {canEdit && (
+                            <Pencil size={12} className="text-gray-300" />
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 font-medium">
+                          {formatTime(session.start_time)} – {formatTime(session.end_time)}
+                        </p>
+                      </div>
+                      {canMarkAttendance ? (
+                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleSessionAttendance(session.id, "attended")}
+                            disabled={actionLoading === session.id}
+                            className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                          >
+                            <CheckCircle size={16} className="text-emerald-500" />
+                          </button>
+                          <button
+                            onClick={() => handleSessionAttendance(session.id, "absent")}
+                            disabled={actionLoading === session.id}
+                            className="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                          >
+                            <XCircle size={16} className="text-rose-400" />
+                          </button>
+                        </div>
+                      ) : (
+                        <Badge variant={session.status}>
+                          {SESSION_STATUS[session.status as keyof typeof SESSION_STATUS]}
+                        </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 font-medium">
-                      {formatTime(session.start_time)} – {formatTime(session.end_time)}
-                    </p>
-                  </div>
-                  <Badge variant={session.status}>
-                    {SESSION_STATUS[session.status as keyof typeof SESSION_STATUS]}
-                  </Badge>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </motion.div>
           )}
         </section>
