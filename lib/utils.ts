@@ -24,7 +24,8 @@ export function generateToken(): string {
 /**
  * Format waktu dari "17:30:00" ke "17.30"
  */
-export function formatTime(time: string): string {
+export function formatTime(time: string | null | undefined): string {
+  if (!time) return "--:--";
   const [h, m] = time.split(":");
   return `${h}.${m}`;
 }

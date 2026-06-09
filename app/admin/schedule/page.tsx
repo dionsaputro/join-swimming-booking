@@ -59,11 +59,10 @@ export default function SchedulePage() {
             .order("start_time", { ascending: true }),
           supabase
             .from("sessions")
-            .select("id, slot_id, scheduled_date, status, student_id, students(full_name)")
+            .select("id, slot_id, scheduled_date, start_time, end_time, status, student_id, is_public, students(full_name)")
             .gte("scheduled_date", startDate)
             .lte("scheduled_date", endDate)
-            .neq("status", "rescheduled")
-            .not("slot_id", "is", null),
+            .neq("status", "rescheduled"),
         ]);
 
         setSlots(slotsRes.data ?? []);
@@ -79,8 +78,16 @@ export default function SchedulePage() {
 
   // Dates that have sessions
   const datesWithSessions = useMemo(() => {
-    const dates = new Set<string>();
-    sessions.forEach((s) => dates.add(s.scheduled_date));
+    const dates = new Map<string, { hasGroup: boolean; hasPrivate: boolean }>();
+    sessions.forEach((s) => {
+      const existing = dates.get(s.scheduled_date) || { hasGroup: false, hasPrivate: false };
+      if (s.slot_id === null) {
+        existing.hasPrivate = true;
+      } else {
+        existing.hasGroup = true;
+      }
+      dates.set(s.scheduled_date, existing);
+    });
     return dates;
   }, [sessions]);
 
@@ -90,7 +97,17 @@ export default function SchedulePage() {
     return sessions.filter((s) => s.scheduled_date === selectedDate);
   }, [selectedDate, sessions]);
 
-  // Slots for selected date's day of week + unmatched sessions
+  // Group sessions (have slot_id)
+  const groupSessions = useMemo(() => {
+    return selectedDateSessions.filter((s) => s.slot_id !== null);
+  }, [selectedDateSessions]);
+
+  // Private sessions (slot_id is null)
+  const privateSessions = useMemo(() => {
+    return selectedDateSessions.filter((s) => s.slot_id === null);
+  }, [selectedDateSessions]);
+
+  // Slots for selected date's day of week + unmatched group sessions
   const selectedDaySlots = useMemo(() => {
     if (!selectedDate) return [];
     const dayOfWeek = new Date(selectedDate + "T00:00:00").getDay();
@@ -99,29 +116,28 @@ export default function SchedulePage() {
     const coveredSessionIds = new Set<string>();
 
     const slotData = daySlots.map((slot) => {
-      const slotSessions = selectedDateSessions.filter((s) =>
+      const slotSess = groupSessions.filter((s: any) =>
         s.slot_id === slot.id || (s.start_time === slot.start_time && s.end_time === slot.end_time)
       );
-      slotSessions.forEach((s: any) => coveredSessionIds.add(s.id));
-      return { ...slot, slotSessions, isVirtual: false };
+      slotSess.forEach((s: any) => coveredSessionIds.add(s.id));
+      return { ...slot, slotSessions: slotSess, isVirtual: false };
     });
 
-    // Uncovered sessions (edited to this day but time doesn't match any slot)
-    const uncovered = selectedDateSessions.filter((s) => !coveredSessionIds.has(s.id));
+    const uncovered = groupSessions.filter((s: any) => !coveredSessionIds.has(s.id));
     const timeGroups: Record<string, any[]> = {};
-    uncovered.forEach((s) => {
+    uncovered.forEach((s: any) => {
       const key = `${s.start_time}-${s.end_time}`;
       if (!timeGroups[key]) timeGroups[key] = [];
       timeGroups[key].push(s);
     });
 
-    const virtualSlots = Object.entries(timeGroups).map(([key, groupSessions]) => ({
+    const virtualSlots = Object.entries(timeGroups).map(([key, grpSess]) => ({
       id: `virtual-${key}`,
-      start_time: groupSessions[0].start_time,
-      end_time: groupSessions[0].end_time,
-      max_capacity: groupSessions.length,
+      start_time: grpSess[0].start_time,
+      end_time: grpSess[0].end_time,
+      max_capacity: grpSess.length,
       is_active: true,
-      slotSessions: groupSessions,
+      slotSessions: grpSess,
       isVirtual: true,
     }));
 
@@ -180,7 +196,7 @@ export default function SchedulePage() {
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-              const hasSession = datesWithSessions.has(dateStr);
+              const dateInfo = datesWithSessions.get(dateStr);
               const isSelected = selectedDate === dateStr;
               const isToday = dateStr === new Date().toISOString().split("T")[0];
 
@@ -200,11 +216,17 @@ export default function SchedulePage() {
                   `}
                 >
                   {day}
-                  {hasSession && !isSelected && (
-                    <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-brand-500" />
+                  {!isSelected && dateInfo && (
+                    <span className="absolute bottom-1 flex gap-0.5">
+                      {dateInfo.hasGroup && <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />}
+                      {dateInfo.hasPrivate && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                    </span>
                   )}
-                  {hasSession && isSelected && (
-                    <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-white/70" />
+                  {isSelected && dateInfo && (
+                    <span className="absolute bottom-1 flex gap-0.5">
+                      {dateInfo.hasGroup && <span className="w-1.5 h-1.5 rounded-full bg-white/70" />}
+                      {dateInfo.hasPrivate && <span className="w-1.5 h-1.5 rounded-full bg-emerald-300" />}
+                    </span>
                   )}
                 </motion.button>
               );
@@ -329,6 +351,39 @@ export default function SchedulePage() {
                     );
                   })}
                 </motion.div>
+              )}
+
+              {/* Private Sessions */}
+              {privateSessions.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center gap-2 mb-2 px-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Private ({privateSessions.length})</h4>
+                  </div>
+                  <div className="space-y-2">
+                    {privateSessions.map((s: any) => (
+                      <div key={s.id} className="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+                        <div className="h-1 bg-emerald-400" />
+                        <div className="p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                              <Clock size={16} className="text-emerald-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-gray-800">{s.students?.full_name}</p>
+                              <p className="text-xs text-gray-400 font-medium">
+                                {formatTime(s.start_time)} – {formatTime(s.end_time)}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
+                            Private
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </motion.div>
           )}
