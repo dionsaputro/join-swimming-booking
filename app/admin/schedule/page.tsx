@@ -84,12 +84,43 @@ export default function SchedulePage() {
     return dates;
   }, [sessions]);
 
-  // Slots for selected date's day of week
+  // Slots for selected date's day of week + unmatched sessions
   const selectedDaySlots = useMemo(() => {
     if (!selectedDate) return [];
     const dayOfWeek = new Date(selectedDate + "T00:00:00").getDay();
-    return slots.filter((s) => s.day_of_week === dayOfWeek);
-  }, [selectedDate, slots]);
+    const daySlots = slots.filter((s) => s.day_of_week === dayOfWeek);
+
+    const coveredSessionIds = new Set<string>();
+
+    const slotData = daySlots.map((slot) => {
+      const slotSessions = selectedDateSessions.filter((s) =>
+        s.slot_id === slot.id || (s.start_time === slot.start_time && s.end_time === slot.end_time)
+      );
+      slotSessions.forEach((s: any) => coveredSessionIds.add(s.id));
+      return { ...slot, slotSessions, isVirtual: false };
+    });
+
+    // Uncovered sessions (edited to this day but time doesn't match any slot)
+    const uncovered = selectedDateSessions.filter((s) => !coveredSessionIds.has(s.id));
+    const timeGroups: Record<string, any[]> = {};
+    uncovered.forEach((s) => {
+      const key = `${s.start_time}-${s.end_time}`;
+      if (!timeGroups[key]) timeGroups[key] = [];
+      timeGroups[key].push(s);
+    });
+
+    const virtualSlots = Object.entries(timeGroups).map(([key, groupSessions]) => ({
+      id: `virtual-${key}`,
+      start_time: groupSessions[0].start_time,
+      end_time: groupSessions[0].end_time,
+      max_capacity: groupSessions.length,
+      is_active: true,
+      slotSessions: groupSessions,
+      isVirtual: true,
+    }));
+
+    return [...slotData, ...virtualSlots];
+  }, [selectedDate, slots, selectedDateSessions]);
 
   // Sessions for selected date
   const selectedDateSessions = useMemo(() => {
@@ -212,7 +243,7 @@ export default function SchedulePage() {
               ) : (
                 <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-3">
                   {selectedDaySlots.map((slot) => {
-                    const slotSessions = selectedDateSessions.filter((s) => s.slot_id === slot.id);
+                    const slotSessions: any[] = slot.slotSessions;
                     const fillPercentage = (slotSessions.length / slot.max_capacity) * 100;
                     const isFull = slotSessions.length >= slot.max_capacity;
 
