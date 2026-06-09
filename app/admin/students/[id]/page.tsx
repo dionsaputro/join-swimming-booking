@@ -15,7 +15,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { createPackage, convertTrialToPackage } from "@/lib/actions/packages";
 import { updateStudent, deleteStudent } from "@/lib/actions/students";
-import { createPrivateSession } from "@/lib/actions/private-sessions";
+import { createPrivatePackage } from "@/lib/actions/private-sessions";
 import { formatTime } from "@/lib/utils";
 import { LEVEL_LABELS, LEVELS, SESSION_STATUS, DAYS_OF_WEEK } from "@/lib/constants";
 
@@ -72,10 +72,14 @@ export default function StudentDetailPage() {
 
   // Private Session Modal
   const [showPrivateModal, setShowPrivateModal] = useState(false);
-  const [pvtDate, setPvtDate] = useState("");
-  const [pvtStartTime, setPvtStartTime] = useState("");
-  const [pvtEndTime, setPvtEndTime] = useState("");
-  const [pvtNote, setPvtNote] = useState("");
+  const [pvtType, setPvtType] = useState<"trial" | "paket">("paket");
+  const [pvtSessions, setPvtSessions] = useState<Array<{ date: string; start_time: string; end_time: string }>>([
+    { date: "", start_time: "", end_time: "" },
+    { date: "", start_time: "", end_time: "" },
+    { date: "", start_time: "", end_time: "" },
+    { date: "", start_time: "", end_time: "" },
+  ]);
+  const [pvtAmount, setPvtAmount] = useState("");
   const [pvtError, setPvtError] = useState("");
   const [pvtCreating, setPvtCreating] = useState(false);
 
@@ -219,29 +223,44 @@ export default function StudentDetailPage() {
   }
 
   async function handleCreatePrivate() {
-    if (!pvtDate || !pvtStartTime || !pvtEndTime) {
-      setPvtError("Tanggal dan waktu wajib diisi");
+    const count = pvtType === "trial" ? 1 : 4;
+    const sessionsToUse = pvtSessions.slice(0, count);
+
+    // Validate
+    for (let i = 0; i < count; i++) {
+      const s = sessionsToUse[i];
+      if (!s.date || !s.start_time || !s.end_time) {
+        setPvtError(`Sesi ${i + 1}: tanggal dan waktu wajib diisi`);
+        return;
+      }
+      if (s.start_time >= s.end_time) {
+        setPvtError(`Sesi ${i + 1}: waktu mulai harus sebelum waktu selesai`);
+        return;
+      }
+    }
+    if (!pvtAmount) {
+      setPvtError("Nominal wajib diisi");
       return;
     }
-    if (pvtStartTime >= pvtEndTime) {
-      setPvtError("Waktu mulai harus sebelum waktu selesai");
-      return;
-    }
+
     setPvtCreating(true);
     setPvtError("");
     try {
-      await createPrivateSession({
+      await createPrivatePackage({
         student_id: id,
-        scheduled_date: pvtDate,
-        start_time: pvtStartTime + ":00",
-        end_time: pvtEndTime + ":00",
-        admin_note: pvtNote.trim() || undefined,
+        session_type: pvtType,
+        sessions: sessionsToUse.map((s) => ({
+          date: s.date,
+          start_time: s.start_time + ":00",
+          end_time: s.end_time + ":00",
+        })),
+        amount: parseInt(pvtAmount),
       });
       setShowPrivateModal(false);
       resetPrivateForm();
       fetchData();
     } catch (err) {
-      setPvtError(err instanceof Error ? err.message : "Gagal membuat sesi private");
+      setPvtError(err instanceof Error ? err.message : "Gagal membuat paket private");
     } finally {
       setPvtCreating(false);
     }
@@ -263,10 +282,14 @@ export default function StudentDetailPage() {
   }
 
   function resetPrivateForm() {
-    setPvtDate("");
-    setPvtStartTime("");
-    setPvtEndTime("");
-    setPvtNote("");
+    setPvtType("paket");
+    setPvtSessions([
+      { date: "", start_time: "", end_time: "" },
+      { date: "", start_time: "", end_time: "" },
+      { date: "", start_time: "", end_time: "" },
+      { date: "", start_time: "", end_time: "" },
+    ]);
+    setPvtAmount("");
     setPvtError("");
   }
 
@@ -484,17 +507,76 @@ export default function StudentDetailPage() {
       </Modal>
 
       {/* Private Session Modal */}
-      <Modal isOpen={showPrivateModal} onClose={() => setShowPrivateModal(false)} title="Tambah Sesi Private">
+      <Modal isOpen={showPrivateModal} onClose={() => setShowPrivateModal(false)} title="Paket Private">
         <div className="space-y-4">
-          <p className="text-xs text-gray-400">Sesi private tidak menggunakan slot regular dan tidak tampil di kalender publik.</p>
-          <Input label="Tanggal" type="date" value={pvtDate} onChange={(e) => setPvtDate(e.target.value)} />
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Jam Mulai" type="time" value={pvtStartTime} onChange={(e) => setPvtStartTime(e.target.value)} />
-            <Input label="Jam Selesai" type="time" value={pvtEndTime} onChange={(e) => setPvtEndTime(e.target.value)} />
+          <p className="text-xs text-gray-400">Sesi private menggunakan jam custom di luar slot regular. Tidak tampil di kalender publik.</p>
+
+          {/* Type */}
+          <div className="space-y-1.5">
+            <label className="block text-sm font-semibold text-gray-700">Tipe</label>
+            <div className="flex gap-2">
+              {(["trial", "paket"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setPvtType(type)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+                    pvtType === type ? "bg-brand-600 text-white" : "bg-gray-50 text-gray-500 border border-gray-200"
+                  }`}
+                >
+                  {type === "trial" ? "Trial (1 sesi)" : "Paket (4 sesi)"}
+                </button>
+              ))}
+            </div>
           </div>
-          <Input label="Catatan (opsional)" value={pvtNote} onChange={(e) => setPvtNote(e.target.value)} placeholder="Catatan untuk sesi ini" />
+
+          {/* Sessions */}
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-gray-700">Jadwal Sesi</label>
+            {Array.from({ length: pvtType === "trial" ? 1 : 4 }).map((_, idx) => (
+              <div key={idx} className="bg-gray-50 rounded-xl p-3 space-y-2">
+                <p className="text-[11px] font-bold text-gray-500">Sesi {idx + 1}</p>
+                <input
+                  type="date"
+                  value={pvtSessions[idx]?.date || ""}
+                  onChange={(e) => {
+                    const updated = [...pvtSessions];
+                    updated[idx] = { ...updated[idx], date: e.target.value };
+                    setPvtSessions(updated);
+                  }}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="time"
+                    value={pvtSessions[idx]?.start_time || ""}
+                    onChange={(e) => {
+                      const updated = [...pvtSessions];
+                      updated[idx] = { ...updated[idx], start_time: e.target.value };
+                      setPvtSessions(updated);
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
+                  <input
+                    type="time"
+                    value={pvtSessions[idx]?.end_time || ""}
+                    onChange={(e) => {
+                      const updated = [...pvtSessions];
+                      updated[idx] = { ...updated[idx], end_time: e.target.value };
+                      setPvtSessions(updated);
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Amount */}
+          <Input label="Nominal (Rp)" type="number" placeholder="400000" value={pvtAmount} onChange={(e) => setPvtAmount(e.target.value)} />
+
           {pvtError && <p className="text-xs text-rose-500 font-medium">{pvtError}</p>}
-          <Button className="w-full" onClick={handleCreatePrivate} isLoading={pvtCreating}>Buat Sesi Private</Button>
+          <Button className="w-full" onClick={handleCreatePrivate} isLoading={pvtCreating}>Buat Paket Private</Button>
         </div>
       </Modal>
 

@@ -2,83 +2,99 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { addDays, format } from "date-fns";
 
-export async function createPrivateSession(formData: {
+interface PrivateSessionSchedule {
+  date: string;       // "2024-06-10"
+  start_time: string; // "15:00:00"
+  end_time: string;   // "16:00:00"
+}
+
+export async function createPrivatePackage(formData: {
   student_id: string;
-  scheduled_date: string;
-  start_time: string;
-  end_time: string;
-  admin_note?: string;
+  session_type: "trial" | "paket";
+  sessions: PrivateSessionSchedule[];
+  amount: number;
 }) {
   const supabase = createClient();
 
-  // Validate that the time doesn't clash with predefined slots on that day
-  const dayOfWeek = new Date(formData.scheduled_date + "T00:00:00").getDay();
-  const { data: existingSlots } = await supabase
-    .from("slots")
-    .select("start_time, end_time")
-    .eq("day_of_week", dayOfWeek)
-    .eq("is_active", true);
+  const totalSessions = formData.session_type === "trial" ? 1 : 4;
 
-  if (existingSlots) {
-    for (const slot of existingSlots) {
-      // Check overlap: new session overlaps with existing slot
-      if (formData.start_time < slot.end_time && formData.end_time > slot.start_time) {
-        throw new Error(
-          `Waktu bentrok dengan slot yang sudah ada (${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}). Sesi private harus di luar jam slot regular.`
-        );
+  if (formData.sessions.length !== totalSessions) {
+    throw new Error(`Harus ada ${totalSessions} sesi untuk tipe ${formData.session_type}`);
+  }
+
+  // Validate each session time doesn't clash with regular slots
+  for (const sess of formData.sessions) {
+    const dayOfWeek = new Date(sess.date + "T00:00:00").getDay();
+    const { data: existingSlots } = await supabase
+      .from("slots")
+      .select("start_time, end_time")
+      .eq("day_of_week", dayOfWeek)
+      .eq("is_active", true);
+
+    if (existingSlots) {
+      for (const slot of existingSlots) {
+        if (sess.start_time < slot.end_time && sess.end_time > slot.start_time) {
+          throw new Error(
+            `Sesi tanggal ${sess.date} (${sess.start_time.slice(0, 5)}-${sess.end_time.slice(0, 5)}) bentrok dengan slot regular (${slot.start_time.slice(0, 5)}-${slot.end_time.slice(0, 5)}).`
+          );
+        }
       }
     }
   }
 
-  const { data, error } = await supabase
-    .from("sessions")
+  // Determine start_date and end_date
+  const sortedDates = formData.sessions.map((s) => s.date).sort();
+  const startDate = sortedDates[0];
+  const endDate = format(addDays(new Date(startDate), 30), "yyyy-MM-dd");
+
+  // Create package
+  const { data: pkg, error: pkgError } = await supabase
+    .from("packages")
     .insert({
       student_id: formData.student_id,
-      slot_id: null,
-      package_id: null,
-      scheduled_date: formData.scheduled_date,
-      start_time: formData.start_time,
-      end_time: formData.end_time,
-      status: "scheduled",
-      is_public: false,
-      admin_note: formData.admin_note || null,
-      reschedule_from: null,
+      session_type: formData.session_type,
+      total_sessions: totalSessions,
+      used_sessions: 0,
+      start_date: startDate,
+      end_date: endDate,
+      status: "active",
+      amount: formData.amount,
+      is_paid: false,
     })
     .select()
     .single();
 
-  if (error) throw error;
+  if (pkgError) throw pkgError;
+
+  // Create sessions (private: slot_id = null, is_public = false)
+  const sessionsToInsert = formData.sessions.map((sess) => ({
+    package_id: pkg.id,
+    student_id: formData.student_id,
+    slot_id: null,
+    scheduled_date: sess.date,
+    start_time: sess.start_time,
+    end_time: sess.end_time,
+    status: "scheduled" as const,
+    is_public: false,
+  }));
+
+  const { error: sessionsError } = await supabase
+    .from("sessions")
+    .insert(sessionsToInsert);
+
+  if (sessionsError) throw sessionsError;
+
+  // Update student session_type
+  await supabase
+    .from("students")
+    .update({ session_type: formData.session_type })
+    .eq("id", formData.student_id);
 
   revalidatePath("/admin");
   revalidatePath(`/admin/students/${formData.student_id}`);
-  revalidatePath("/admin/schedule");
+  revalidatePath("/admin/payments");
 
-  return data;
-}
-
-export async function getPrivateSessionsByStudent(studentId: string) {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("sessions")
-    .select("*")
-    .eq("student_id", studentId)
-    .is("slot_id", null)
-    .order("scheduled_date", { ascending: false });
-
-  if (error) throw error;
-  return data;
-}
-
-export async function deletePrivateSession(sessionId: string) {
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("sessions")
-    .delete()
-    .eq("id", sessionId)
-    .is("slot_id", null); // Safety: only delete if it's a private session
-
-  if (error) throw error;
-  revalidatePath("/admin");
-  revalidatePath("/admin/schedule");
+  return pkg;
 }
