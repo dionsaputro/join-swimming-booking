@@ -219,13 +219,13 @@ export default function SchedulePage() {
                   {!isSelected && dateInfo && (
                     <span className="absolute bottom-1 flex gap-0.5">
                       {dateInfo.hasGroup && <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />}
-                      {dateInfo.hasPrivate && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                      {dateInfo.hasPrivate && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
                     </span>
                   )}
                   {isSelected && dateInfo && (
                     <span className="absolute bottom-1 flex gap-0.5">
                       {dateInfo.hasGroup && <span className="w-1.5 h-1.5 rounded-full bg-white/70" />}
-                      {dateInfo.hasPrivate && <span className="w-1.5 h-1.5 rounded-full bg-emerald-300" />}
+                      {dateInfo.hasPrivate && <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />}
                     </span>
                   )}
                 </motion.button>
@@ -357,17 +357,17 @@ export default function SchedulePage() {
               {privateSessions.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-2 px-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Private ({privateSessions.length})</h4>
                   </div>
                   <div className="space-y-2">
                     {privateSessions.map((s: any) => (
-                      <div key={s.id} className="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
-                        <div className="h-1 bg-emerald-400" />
+                      <div key={s.id} className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden">
+                        <div className="h-1 bg-amber-400" />
                         <div className="p-4 flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
-                              <Clock size={16} className="text-emerald-600" />
+                            <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
+                              <Clock size={16} className="text-amber-600" />
                             </div>
                             <div>
                               <p className="text-sm font-bold text-gray-800">{s.students?.full_name}</p>
@@ -376,7 +376,7 @@ export default function SchedulePage() {
                               </p>
                             </div>
                           </div>
-                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">
                             Private
                           </span>
                         </div>
