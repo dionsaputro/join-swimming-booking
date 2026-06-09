@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createPackage, convertTrialToPackage } from "@/lib/actions/packages";
 import { updateStudent, deleteStudent } from "@/lib/actions/students";
 import { createPrivatePackage } from "@/lib/actions/private-sessions";
+import { updateSession } from "@/lib/actions/sessions";
 import { formatTime } from "@/lib/utils";
 import { LEVEL_LABELS, LEVELS, SESSION_STATUS, DAYS_OF_WEEK } from "@/lib/constants";
 
@@ -82,6 +83,15 @@ export default function StudentDetailPage() {
   const [pvtAmount, setPvtAmount] = useState("");
   const [pvtError, setPvtError] = useState("");
   const [pvtCreating, setPvtCreating] = useState(false);
+
+  // Edit Session Modal
+  const [showEditSessionModal, setShowEditSessionModal] = useState(false);
+  const [editSessionId, setEditSessionId] = useState("");
+  const [editSessionDate, setEditSessionDate] = useState("");
+  const [editSessionStart, setEditSessionStart] = useState("");
+  const [editSessionEnd, setEditSessionEnd] = useState("");
+  const [editSessionError, setEditSessionError] = useState("");
+  const [editingSession, setEditingSession] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -293,6 +303,41 @@ export default function StudentDetailPage() {
     setPvtError("");
   }
 
+  function openEditSession(session: any) {
+    setEditSessionId(session.id);
+    setEditSessionDate(session.scheduled_date);
+    setEditSessionStart(session.start_time.slice(0, 5));
+    setEditSessionEnd(session.end_time.slice(0, 5));
+    setEditSessionError("");
+    setShowEditSessionModal(true);
+  }
+
+  async function handleEditSession() {
+    if (!editSessionDate || !editSessionStart || !editSessionEnd) {
+      setEditSessionError("Semua field wajib diisi");
+      return;
+    }
+    if (editSessionStart >= editSessionEnd) {
+      setEditSessionError("Jam mulai harus sebelum jam selesai");
+      return;
+    }
+    setEditingSession(true);
+    setEditSessionError("");
+    try {
+      await updateSession(editSessionId, {
+        scheduled_date: editSessionDate,
+        start_time: editSessionStart + ":00",
+        end_time: editSessionEnd + ":00",
+      });
+      setShowEditSessionModal(false);
+      fetchData();
+    } catch (err) {
+      setEditSessionError(err instanceof Error ? err.message : "Gagal mengubah jadwal");
+    } finally {
+      setEditingSession(false);
+    }
+  }
+
   if (loading) {
     return (
       <PageTransition>
@@ -434,7 +479,14 @@ export default function StudentDetailPage() {
           ) : (
             <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
               {sessions.map((session) => (
-                <motion.div key={session.id} variants={item} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
+                <motion.div
+                  key={session.id}
+                  variants={item}
+                  className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between ${
+                    session.status === "scheduled" ? "cursor-pointer hover:shadow-md transition-shadow" : ""
+                  }`}
+                  onClick={() => session.status === "scheduled" && openEditSession(session)}
+                >
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-gray-800">
@@ -448,6 +500,9 @@ export default function StudentDetailPage() {
                         <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">
                           Private
                         </span>
+                      )}
+                      {session.status === "scheduled" && (
+                        <Pencil size={12} className="text-gray-300" />
                       )}
                     </div>
                     <p className="text-xs text-gray-400 font-medium">
@@ -577,6 +632,20 @@ export default function StudentDetailPage() {
 
           {pvtError && <p className="text-xs text-rose-500 font-medium">{pvtError}</p>}
           <Button className="w-full" onClick={handleCreatePrivate} isLoading={pvtCreating}>Buat Paket Private</Button>
+        </div>
+      </Modal>
+
+      {/* Edit Session Modal */}
+      <Modal isOpen={showEditSessionModal} onClose={() => setShowEditSessionModal(false)} title="Edit Jadwal Sesi">
+        <div className="space-y-4">
+          <p className="text-xs text-gray-400">Ubah tanggal atau jam sesi ini.</p>
+          <Input label="Tanggal" type="date" value={editSessionDate} onChange={(e) => setEditSessionDate(e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Jam Mulai" type="time" value={editSessionStart} onChange={(e) => setEditSessionStart(e.target.value)} />
+            <Input label="Jam Selesai" type="time" value={editSessionEnd} onChange={(e) => setEditSessionEnd(e.target.value)} />
+          </div>
+          {editSessionError && <p className="text-xs text-rose-500 font-medium">{editSessionError}</p>}
+          <Button className="w-full" onClick={handleEditSession} isLoading={editingSession}>Simpan Perubahan</Button>
         </div>
       </Modal>
 

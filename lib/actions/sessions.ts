@@ -74,3 +74,48 @@ export async function toggleSessionVisibility(sessionId: string, isPublic: boole
   if (error) throw error;
   revalidatePath("/calendar");
 }
+
+export async function updateSession(
+  sessionId: string,
+  formData: {
+    scheduled_date?: string;
+    start_time?: string;
+    end_time?: string;
+    slot_id?: string | null;
+  }
+) {
+  const supabase = createClient();
+
+  // If changing to a regular slot, check capacity
+  if (formData.slot_id && formData.scheduled_date) {
+    const { data: slot } = await supabase
+      .from("slots")
+      .select("max_capacity")
+      .eq("id", formData.slot_id)
+      .single();
+
+    if (slot) {
+      const { count } = await supabase
+        .from("sessions")
+        .select("*", { count: "exact", head: true })
+        .eq("slot_id", formData.slot_id)
+        .eq("scheduled_date", formData.scheduled_date)
+        .neq("status", "rescheduled")
+        .neq("id", sessionId);
+
+      if ((count ?? 0) >= slot.max_capacity) {
+        throw new Error("Slot sudah penuh pada tanggal tersebut");
+      }
+    }
+  }
+
+  const { error } = await supabase
+    .from("sessions")
+    .update(formData as Record<string, unknown>)
+    .eq("id", sessionId);
+
+  if (error) throw error;
+  revalidatePath("/admin");
+  revalidatePath("/admin/schedule");
+  revalidatePath("/calendar");
+}
