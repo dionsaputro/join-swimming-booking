@@ -28,8 +28,10 @@ const item = {
 export default function StudentsPage() {
   const [search, setSearch] = useState("");
   const [filterLevel, setFilterLevel] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
   const [students, setStudents] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -49,7 +51,7 @@ export default function StudentsPage() {
   async function fetchData() {
     try {
       const supabase = createClient();
-      const [studentsRes, packagesRes] = await Promise.all([
+      const [studentsRes, packagesRes, sessionsRes] = await Promise.all([
         supabase
           .from("students")
           .select("*")
@@ -58,9 +60,14 @@ export default function StudentsPage() {
           .from("packages")
           .select("*")
           .eq("status", "active"),
+        supabase
+          .from("sessions")
+          .select("id, student_id, slot_id")
+          .neq("status", "rescheduled"),
       ]);
       setStudents(studentsRes.data ?? []);
       setPackages(packagesRes.data ?? []);
+      setSessions(sessionsRes.data ?? []);
     } catch {
       // silent
     } finally {
@@ -106,7 +113,19 @@ export default function StudentsPage() {
   const filteredStudents = students.filter((student) => {
     const matchSearch = student.full_name.toLowerCase().includes(search.toLowerCase());
     const matchLevel = filterLevel === "all" || student.level === filterLevel;
-    return matchSearch && matchLevel;
+
+    // Type filter: private = has sessions with slot_id null, group = has sessions with slot_id not null
+    let matchType = true;
+    if (filterType !== "all") {
+      const studentSessions = sessions.filter((s) => s.student_id === student.id);
+      if (filterType === "private") {
+        matchType = studentSessions.some((s) => s.slot_id === null);
+      } else if (filterType === "group") {
+        matchType = studentSessions.some((s) => s.slot_id !== null);
+      }
+    }
+
+    return matchSearch && matchLevel && matchType;
   });
 
   if (loading) {
@@ -151,20 +170,41 @@ export default function StudentsPage() {
         </div>
 
         {/* Filter */}
-        <div className="flex gap-2">
-          {["all", "pemula", "menengah", "lanjut"].map((level) => (
-            <button
-              key={level}
-              onClick={() => setFilterLevel(level)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                filterLevel === level
-                  ? "bg-brand-600 text-white"
-                  : "bg-white text-gray-500 border border-gray-100"
-              }`}
-            >
-              {level === "all" ? "Semua" : LEVEL_LABELS[level]}
-            </button>
-          ))}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            {["all", "pemula", "menengah", "lanjut"].map((level) => (
+              <button
+                key={level}
+                onClick={() => setFilterLevel(level)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                  filterLevel === level
+                    ? "bg-brand-600 text-white"
+                    : "bg-white text-gray-500 border border-gray-100"
+                }`}
+              >
+                {level === "all" ? "Semua" : LEVEL_LABELS[level]}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {[
+              { key: "all", label: "Semua Tipe" },
+              { key: "group", label: "Group" },
+              { key: "private", label: "Private" },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setFilterType(f.key)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                  filterType === f.key
+                    ? "bg-brand-600 text-white"
+                    : "bg-white text-gray-500 border border-gray-100"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Student List */}
