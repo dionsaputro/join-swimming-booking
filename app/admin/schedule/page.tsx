@@ -62,7 +62,8 @@ export default function SchedulePage() {
             .select("id, slot_id, scheduled_date, status, student_id, students(full_name)")
             .gte("scheduled_date", startDate)
             .lte("scheduled_date", endDate)
-            .neq("status", "rescheduled"),
+            .neq("status", "rescheduled")
+            .not("slot_id", "is", null),
         ]);
 
         setSlots(slotsRes.data ?? []);
