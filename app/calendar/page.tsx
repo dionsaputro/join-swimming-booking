@@ -93,8 +93,40 @@ export default function PublicCalendarPage() {
   const selectedDaySlots = useMemo(() => {
     if (!selectedDate) return [];
     const dayOfWeek = new Date(selectedDate + "T00:00:00").getDay();
-    return slots.filter((s) => s.day_of_week === dayOfWeek);
-  }, [selectedDate, slots]);
+    const daySlots = slots.filter((s) => s.day_of_week === dayOfWeek);
+
+    // Group sessions by their time slot OR by their start_time if no matching slot
+    // First: sessions matched to slots
+    const matchedSessionIds = new Set<string>();
+    const slotData = daySlots.map((slot) => {
+      const slotSessions = selectedSessions.filter((s) => s.slot_id === slot.id);
+      slotSessions.forEach((s) => matchedSessionIds.add(s.id));
+      return { ...slot, slotSessions };
+    });
+
+    // Second: sessions not matched to any slot (edited to this day but slot_id is from another day)
+    const unmatchedSessions = selectedSessions.filter((s) => !matchedSessionIds.has(s.id));
+
+    // Create virtual "slots" for unmatched sessions grouped by time
+    const timeGroups: Record<string, any[]> = {};
+    unmatchedSessions.forEach((s) => {
+      const key = `${s.start_time}-${s.end_time}`;
+      if (!timeGroups[key]) timeGroups[key] = [];
+      timeGroups[key].push(s);
+    });
+
+    const virtualSlots = Object.entries(timeGroups).map(([key, sessions]) => ({
+      id: `virtual-${key}`,
+      start_time: sessions[0].start_time,
+      end_time: sessions[0].end_time,
+      max_capacity: 7,
+      is_active: true,
+      slotSessions: sessions,
+      isVirtual: true,
+    }));
+
+    return [...slotData.map((s) => ({ ...s, isVirtual: false })), ...virtualSlots];
+  }, [selectedDate, slots, selectedSessions]);
 
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
@@ -211,15 +243,11 @@ export default function PublicCalendarPage() {
                   })}
                 </h3>
                 <p className="text-xs text-gray-400 font-medium mt-0.5">
-                  {selectedDaySlots.length} slot tersedia
+                  {selectedSessions.length} peserta terdaftar
                 </p>
               </div>
 
-              {fetching ? (
-                <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm">
-                  <p className="text-sm text-gray-400">Memuat...</p>
-                </div>
-              ) : selectedDaySlots.length === 0 ? (
+              {selectedDaySlots.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -234,7 +262,7 @@ export default function PublicCalendarPage() {
                 </motion.div>
               ) : (
                 selectedDaySlots.map((slot, slotIndex) => {
-                  const slotSessions = selectedSessions.filter((s) => s.slot_id === slot.id);
+                  const slotSessions: any[] = slot.slotSessions;
                   const isFull = slotSessions.length >= slot.max_capacity;
                   const fillPercentage = (slotSessions.length / slot.max_capacity) * 100;
                   const spotsLeft = slot.max_capacity - slotSessions.length;
