@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import { ArrowLeft, Copy, Plus, RefreshCw, Check } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Copy, Plus, RefreshCw, Check, Pencil, Trash2, Lock } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import PageTransition from "@/components/layout/PageTransition";
@@ -14,8 +14,10 @@ import Input from "@/components/ui/Input";
 import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { createPackage, convertTrialToPackage } from "@/lib/actions/packages";
+import { updateStudent, deleteStudent } from "@/lib/actions/students";
+import { createPrivateSession } from "@/lib/actions/private-sessions";
 import { formatTime } from "@/lib/utils";
-import { LEVEL_LABELS, SESSION_STATUS, DAYS_OF_WEEK } from "@/lib/constants";
+import { LEVEL_LABELS, LEVELS, SESSION_STATUS, DAYS_OF_WEEK } from "@/lib/constants";
 
 const stagger = {
   hidden: { opacity: 0 },
@@ -29,6 +31,7 @@ const item = {
 
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [student, setStudent] = useState<any>(null);
   const [packages, setPackages] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
@@ -52,6 +55,29 @@ export default function StudentDetailPage() {
   const [convertAmount, setConvertAmount] = useState("");
   const [convertError, setConvertError] = useState("");
   const [converting, setConverting] = useState(false);
+
+  // Edit Student Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editSocial, setEditSocial] = useState("");
+  const [editLevel, setEditLevel] = useState<"pemula" | "menengah" | "lanjut">("pemula");
+  const [editNotes, setEditNotes] = useState("");
+  const [editError, setEditError] = useState("");
+  const [editing, setEditing] = useState(false);
+
+  // Delete Modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Private Session Modal
+  const [showPrivateModal, setShowPrivateModal] = useState(false);
+  const [pvtDate, setPvtDate] = useState("");
+  const [pvtStartTime, setPvtStartTime] = useState("");
+  const [pvtEndTime, setPvtEndTime] = useState("");
+  const [pvtNote, setPvtNote] = useState("");
+  const [pvtError, setPvtError] = useState("");
+  const [pvtCreating, setPvtCreating] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -96,6 +122,51 @@ export default function StudentDetailPage() {
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function openEditModal() {
+    if (!student) return;
+    setEditName(student.full_name);
+    setEditPhone(student.phone);
+    setEditSocial(student.social_handle || "");
+    setEditLevel(student.level);
+    setEditNotes(student.notes || "");
+    setEditError("");
+    setShowEditModal(true);
+  }
+
+  async function handleEdit() {
+    if (!editName.trim() || !editPhone.trim()) {
+      setEditError("Nama dan nomor HP wajib diisi");
+      return;
+    }
+    setEditing(true);
+    setEditError("");
+    try {
+      await updateStudent(id, {
+        full_name: editName.trim(),
+        phone: editPhone.trim(),
+        social_handle: editSocial.trim() || null,
+        level: editLevel,
+        notes: editNotes.trim() || null,
+      });
+      setShowEditModal(false);
+      fetchData();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Gagal mengubah data");
+    } finally {
+      setEditing(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await deleteStudent(id);
+      router.push("/admin/students");
+    } catch {
+      setDeleting(false);
+    }
   }
 
   async function handleCreatePackage() {
@@ -147,6 +218,35 @@ export default function StudentDetailPage() {
     }
   }
 
+  async function handleCreatePrivate() {
+    if (!pvtDate || !pvtStartTime || !pvtEndTime) {
+      setPvtError("Tanggal dan waktu wajib diisi");
+      return;
+    }
+    if (pvtStartTime >= pvtEndTime) {
+      setPvtError("Waktu mulai harus sebelum waktu selesai");
+      return;
+    }
+    setPvtCreating(true);
+    setPvtError("");
+    try {
+      await createPrivateSession({
+        student_id: id,
+        scheduled_date: pvtDate,
+        start_time: pvtStartTime + ":00",
+        end_time: pvtEndTime + ":00",
+        admin_note: pvtNote.trim() || undefined,
+      });
+      setShowPrivateModal(false);
+      resetPrivateForm();
+      fetchData();
+    } catch (err) {
+      setPvtError(err instanceof Error ? err.message : "Gagal membuat sesi private");
+    } finally {
+      setPvtCreating(false);
+    }
+  }
+
   function resetPackageForm() {
     setPkgType("paket");
     setPkgSlotId("");
@@ -160,6 +260,14 @@ export default function StudentDetailPage() {
     setConvertStartDate("");
     setConvertAmount("");
     setConvertError("");
+  }
+
+  function resetPrivateForm() {
+    setPvtDate("");
+    setPvtStartTime("");
+    setPvtEndTime("");
+    setPvtNote("");
+    setPvtError("");
   }
 
   if (loading) {
@@ -201,6 +309,15 @@ export default function StudentDetailPage() {
               <h1 className="text-lg font-bold text-gray-900">{student.full_name}</h1>
               <Badge variant={student.level}>{LEVEL_LABELS[student.level]}</Badge>
             </div>
+            {/* Edit & Delete */}
+            <div className="flex gap-1.5">
+              <button onClick={openEditModal} className="w-9 h-9 rounded-xl bg-gray-50 hover:bg-brand-50 flex items-center justify-center transition-colors">
+                <Pencil size={15} className="text-gray-500" />
+              </button>
+              <button onClick={() => setShowDeleteModal(true)} className="w-9 h-9 rounded-xl bg-gray-50 hover:bg-rose-50 flex items-center justify-center transition-colors">
+                <Trash2 size={15} className="text-gray-500" />
+              </button>
+            </div>
           </div>
           <div className="mt-4 space-y-2 text-sm text-gray-500">
             <p>{student.phone}</p>
@@ -208,7 +325,7 @@ export default function StudentDetailPage() {
             {student.notes && <p className="text-gray-400 italic">{student.notes}</p>}
             <p className="text-xs text-gray-400">Bergabung {new Date(student.joined_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p>
           </div>
-          <div className="mt-4">
+          <div className="mt-4 flex gap-2">
             <Button size="sm" variant="secondary" onClick={handleCopyLink}>
               {copied ? <Check size={14} /> : <Copy size={14} />}
               {copied ? "Tersalin" : "Salin Link Reschedule"}
@@ -251,7 +368,6 @@ export default function StudentDetailPage() {
                     <span className="font-bold text-gray-800">Rp{activePackage.amount.toLocaleString("id-ID")}</span>
                   </div>
                 </div>
-                {/* Session dots */}
                 <div className="flex items-center gap-2 mt-4">
                   {Array.from({ length: activePackage.total_sessions }).map((_, i) => (
                     <div
@@ -273,11 +389,17 @@ export default function StudentDetailPage() {
           </section>
         )}
 
-        {/* Add Package */}
-        <Button variant="primary" className="w-full" onClick={() => setShowPackageModal(true)}>
-          <Plus size={16} />
-          Tambah Paket Baru
-        </Button>
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <Button variant="primary" className="flex-1" onClick={() => setShowPackageModal(true)}>
+            <Plus size={16} />
+            Paket Baru
+          </Button>
+          <Button variant="secondary" className="flex-1" onClick={() => setShowPrivateModal(true)}>
+            <Lock size={16} />
+            Sesi Private
+          </Button>
+        </div>
 
         {/* Session History */}
         <section>
@@ -291,13 +413,20 @@ export default function StudentDetailPage() {
               {sessions.map((session) => (
                 <motion.div key={session.id} variants={item} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">
-                      {new Date(session.scheduled_date + "T00:00:00").toLocaleDateString("id-ID", {
-                        weekday: "short",
-                        day: "numeric",
-                        month: "short",
-                      })}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-800">
+                        {new Date(session.scheduled_date + "T00:00:00").toLocaleDateString("id-ID", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </p>
+                      {!session.slot_id && (
+                        <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">
+                          Private
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-400 font-medium">
                       {formatTime(session.start_time)} – {formatTime(session.end_time)}
                     </p>
@@ -312,6 +441,63 @@ export default function StudentDetailPage() {
         </section>
       </div>
 
+      {/* Edit Student Modal */}
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Data Murid">
+        <div className="space-y-4">
+          <Input label="Nama Lengkap" value={editName} onChange={(e) => setEditName(e.target.value)} />
+          <Input label="No. HP / WhatsApp" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+          <Input label="Social Handle" value={editSocial} onChange={(e) => setEditSocial(e.target.value)} placeholder="@username" />
+          <div className="space-y-1.5">
+            <label className="block text-sm font-semibold text-gray-700">Level</label>
+            <div className="flex gap-2">
+              {LEVELS.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setEditLevel(level)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+                    editLevel === level ? "bg-brand-600 text-white" : "bg-gray-50 text-gray-500 border border-gray-200"
+                  }`}
+                >
+                  {LEVEL_LABELS[level]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Input label="Catatan" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Catatan untuk murid" />
+          {editError && <p className="text-xs text-rose-500 font-medium">{editError}</p>}
+          <Button className="w-full" onClick={handleEdit} isLoading={editing}>Simpan Perubahan</Button>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Hapus Murid">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Yakin ingin menghapus <span className="font-bold">{student.full_name}</span>? Semua data paket dan sesi murid ini akan ikut terhapus.
+          </p>
+          <div className="flex gap-3">
+            <Button variant="ghost" className="flex-1" onClick={() => setShowDeleteModal(false)}>Batal</Button>
+            <Button variant="danger" className="flex-1" onClick={handleDelete} isLoading={deleting}>Hapus</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Private Session Modal */}
+      <Modal isOpen={showPrivateModal} onClose={() => setShowPrivateModal(false)} title="Tambah Sesi Private">
+        <div className="space-y-4">
+          <p className="text-xs text-gray-400">Sesi private tidak menggunakan slot regular dan tidak tampil di kalender publik.</p>
+          <Input label="Tanggal" type="date" value={pvtDate} onChange={(e) => setPvtDate(e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Jam Mulai" type="time" value={pvtStartTime} onChange={(e) => setPvtStartTime(e.target.value)} />
+            <Input label="Jam Selesai" type="time" value={pvtEndTime} onChange={(e) => setPvtEndTime(e.target.value)} />
+          </div>
+          <Input label="Catatan (opsional)" value={pvtNote} onChange={(e) => setPvtNote(e.target.value)} placeholder="Catatan untuk sesi ini" />
+          {pvtError && <p className="text-xs text-rose-500 font-medium">{pvtError}</p>}
+          <Button className="w-full" onClick={handleCreatePrivate} isLoading={pvtCreating}>Buat Sesi Private</Button>
+        </div>
+      </Modal>
+
       {/* Add Package Modal */}
       <Modal isOpen={showPackageModal} onClose={() => setShowPackageModal(false)} title="Tambah Paket Baru">
         <div className="space-y-4">
@@ -324,9 +510,7 @@ export default function StudentDetailPage() {
                   type="button"
                   onClick={() => setPkgType(type)}
                   className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
-                    pkgType === type
-                      ? "bg-brand-600 text-white"
-                      : "bg-gray-50 text-gray-500 border border-gray-200"
+                    pkgType === type ? "bg-brand-600 text-white" : "bg-gray-50 text-gray-500 border border-gray-200"
                   }`}
                 >
                   {type === "trial" ? "Trial" : "Paket (4 sesi)"}
@@ -349,29 +533,14 @@ export default function StudentDetailPage() {
               ))}
             </select>
           </div>
-          <Input
-            label="Tanggal Mulai"
-            type="date"
-            value={pkgStartDate}
-            onChange={(e) => setPkgStartDate(e.target.value)}
-          />
-          <Input
-            label="Nominal (Rp)"
-            type="number"
-            placeholder="400000"
-            value={pkgAmount}
-            onChange={(e) => setPkgAmount(e.target.value)}
-          />
-          {pkgError && (
-            <p className="text-xs text-rose-500 font-medium">{pkgError}</p>
-          )}
-          <Button className="w-full" onClick={handleCreatePackage} isLoading={pkgCreating}>
-            Buat Paket
-          </Button>
+          <Input label="Tanggal Mulai" type="date" value={pkgStartDate} onChange={(e) => setPkgStartDate(e.target.value)} />
+          <Input label="Nominal (Rp)" type="number" placeholder="400000" value={pkgAmount} onChange={(e) => setPkgAmount(e.target.value)} />
+          {pkgError && <p className="text-xs text-rose-500 font-medium">{pkgError}</p>}
+          <Button className="w-full" onClick={handleCreatePackage} isLoading={pkgCreating}>Buat Paket</Button>
         </div>
       </Modal>
 
-      {/* Convert to Package Modal */}
+      {/* Convert Modal */}
       <Modal isOpen={showConvertModal} onClose={() => setShowConvertModal(false)} title="Convert ke Paket">
         <div className="space-y-4">
           <div className="space-y-1.5">
@@ -389,25 +558,10 @@ export default function StudentDetailPage() {
               ))}
             </select>
           </div>
-          <Input
-            label="Tanggal Mulai"
-            type="date"
-            value={convertStartDate}
-            onChange={(e) => setConvertStartDate(e.target.value)}
-          />
-          <Input
-            label="Nominal (Rp)"
-            type="number"
-            placeholder="400000"
-            value={convertAmount}
-            onChange={(e) => setConvertAmount(e.target.value)}
-          />
-          {convertError && (
-            <p className="text-xs text-rose-500 font-medium">{convertError}</p>
-          )}
-          <Button className="w-full" onClick={handleConvert} isLoading={converting}>
-            Convert ke Paket
-          </Button>
+          <Input label="Tanggal Mulai" type="date" value={convertStartDate} onChange={(e) => setConvertStartDate(e.target.value)} />
+          <Input label="Nominal (Rp)" type="number" placeholder="400000" value={convertAmount} onChange={(e) => setConvertAmount(e.target.value)} />
+          {convertError && <p className="text-xs text-rose-500 font-medium">{convertError}</p>}
+          <Button className="w-full" onClick={handleConvert} isLoading={converting}>Convert ke Paket</Button>
         </div>
       </Modal>
     </PageTransition>

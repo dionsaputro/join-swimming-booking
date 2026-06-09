@@ -93,3 +93,14 @@ export async function updateStudent(
   revalidatePath(`/admin/students/${id}`);
   return data;
 }
+
+export async function deleteStudent(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("students")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+  revalidatePath("/admin/students");
+}
