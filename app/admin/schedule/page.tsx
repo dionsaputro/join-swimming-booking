@@ -84,6 +84,12 @@ export default function SchedulePage() {
     return dates;
   }, [sessions]);
 
+  // Sessions for selected date
+  const selectedDateSessions = useMemo(() => {
+    if (!selectedDate) return [];
+    return sessions.filter((s) => s.scheduled_date === selectedDate);
+  }, [selectedDate, sessions]);
+
   // Slots for selected date's day of week + unmatched sessions
   const selectedDaySlots = useMemo(() => {
     if (!selectedDate) return [];
@@ -121,12 +127,6 @@ export default function SchedulePage() {
 
     return [...slotData, ...virtualSlots];
   }, [selectedDate, slots, selectedDateSessions]);
-
-  // Sessions for selected date
-  const selectedDateSessions = useMemo(() => {
-    if (!selectedDate) return [];
-    return sessions.filter((s) => s.scheduled_date === selectedDate);
-  }, [selectedDate, sessions]);
 
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
