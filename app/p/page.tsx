@@ -129,6 +129,14 @@ export default function StudentPortal() {
     return dates;
   }, [calSessions]);
 
+  // Dates where THIS student has sessions (for orange highlight)
+  const myDates = useMemo(() => {
+    const dates = new Set<string>();
+    if (!student) return dates;
+    calSessions.filter((s) => s.student_id === student.id).forEach((s) => dates.add(s.scheduled_date));
+    return dates;
+  }, [calSessions, student]);
+
   const selectedSessions = useMemo(() => {
     if (!selectedDate) return [];
     return calSessions.filter((s) => s.scheduled_date === selectedDate);
@@ -283,6 +291,7 @@ export default function StudentPortal() {
                     const day = i + 1;
                     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                     const hasSession = datesWithSessions.has(dateStr);
+                    const isMine = myDates.has(dateStr);
                     const isSelected = selectedDate === dateStr;
                     const isToday = dateStr === new Date().toISOString().split("T")[0];
                     return (
@@ -290,11 +299,19 @@ export default function StudentPortal() {
                         key={day}
                         onClick={() => setSelectedDate(dateStr)}
                         className={`relative aspect-square flex items-center justify-center rounded-xl text-sm font-medium transition-all
-                          ${isSelected ? "bg-brand-600 text-white shadow-md" : isToday ? "bg-brand-50 text-brand-700 ring-2 ring-brand-200" : "text-gray-700 hover:bg-gray-50"}
+                          ${isSelected
+                            ? "bg-brand-600 text-white shadow-md"
+                            : isMine
+                              ? "bg-amber-50 text-amber-700 ring-2 ring-amber-200"
+                              : isToday
+                                ? "bg-brand-50 text-brand-700 ring-2 ring-brand-200"
+                                : "text-gray-700 hover:bg-gray-50"
+                          }
                         `}
                       >
                         {day}
-                        {hasSession && !isSelected && <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-brand-500" />}
+                        {hasSession && !isSelected && !isMine && <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-brand-500" />}
+                        {isMine && !isSelected && <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-amber-500" />}
                       </button>
                     );
                   })}
