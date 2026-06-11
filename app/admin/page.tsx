@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, XCircle, Clock, Calendar, CreditCard, MessageCircle, Bell } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Calendar, CreditCard, Bell } from "lucide-react";
 import PageTransition from "@/components/layout/PageTransition";
-import Badge from "@/components/ui/Badge";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
@@ -154,7 +153,7 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* Reminder Besok */}
+        {/* Jadwal Besok */}
         {tomorrowSessions.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-3">
@@ -163,9 +162,8 @@ export default function AdminDashboard() {
                 Jadwal Besok ({tomorrowSessions.length})
               </h2>
             </div>
-            <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-3">
+            <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
               {(() => {
-                // Group by time slot
                 const grouped: Record<string, typeof tomorrowSessions> = {};
                 tomorrowSessions.forEach((session) => {
                   const key = `${session.start_time}-${session.end_time}`;
@@ -176,41 +174,21 @@ export default function AdminDashboard() {
                   const groupSess = grouped[key];
                   const first = groupSess[0];
                   return (
-                    <motion.div key={key} variants={item}>
+                    <motion.div key={key} variants={item} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Clock size={14} className="text-amber-500" />
                         <span className="text-xs font-bold text-gray-500">
                           {formatTime(first.start_time)} – {formatTime(first.end_time)}
                         </span>
+                        <span className="text-[11px] text-gray-400">({groupSess.length} murid)</span>
                       </div>
-                      <div className="space-y-2">
-                        {groupSess.map((session: any) => {
-                          const phone = session.students?.phone?.replace(/^0/, "62") || "";
-                          const name = session.students?.full_name || "";
-                          const time = `${formatTime(session.start_time)}-${formatTime(session.end_time)}`;
-                          const tomorrow_date = new Date(Date.now() + 86400000).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
-                          const waText = encodeURIComponent(`Halo ${name}, ini reminder jadwal renang kamu besok ya:\n\n📅 ${tomorrow_date}\n⏰ ${time}\n\nSampai ketemu di kolam! 🏊`);
-                          const waUrl = `https://wa.me/${phone}?text=${waText}`;
-
-                          return (
-                            <div key={session.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <Avatar name={name} size="sm" />
-                                  <p className="text-sm font-semibold text-gray-800">{name}</p>
-                                </div>
-                                <a
-                                  href={waUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors"
-                                >
-                                  <MessageCircle size={18} className="text-emerald-600" />
-                                </a>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div className="flex flex-wrap gap-2">
+                        {groupSess.map((session: any) => (
+                          <div key={session.id} className="flex items-center gap-2">
+                            <Avatar name={session.students?.full_name ?? ""} size="sm" />
+                            <span className="text-sm text-gray-700 font-medium">{session.students?.full_name}</span>
+                          </div>
+                        ))}
                       </div>
                     </motion.div>
                   );
@@ -228,7 +206,7 @@ export default function AdminDashboard() {
               Jadwal Hari Ini ({todaySessions.length})
             </h2>
           </div>
-          <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-3">
+          <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
             {todaySessions.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-10">
                 <Calendar size={24} className="text-gray-300 mx-auto mb-2" />
@@ -236,81 +214,30 @@ export default function AdminDashboard() {
               </div>
             ) : (
               (() => {
-                // Group sessions by time slot
                 const grouped: Record<string, typeof todaySessions> = {};
                 todaySessions.forEach((session) => {
                   const key = `${session.start_time}-${session.end_time}`;
                   if (!grouped[key]) grouped[key] = [];
                   grouped[key].push(session);
                 });
-                const sortedKeys = Object.keys(grouped).sort();
-
-                return sortedKeys.map((key) => {
+                return Object.keys(grouped).sort().map((key) => {
                   const groupSessions = grouped[key];
                   const firstSession = groupSessions[0];
                   return (
-                    <motion.div key={key} variants={item}>
-                      {/* Time slot header */}
+                    <motion.div key={key} variants={item} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Clock size={14} className="text-brand-600" />
                         <span className="text-xs font-bold text-gray-500">
                           {formatTime(firstSession.start_time)} – {formatTime(firstSession.end_time)}
                         </span>
-                        <span className="text-[11px] text-gray-400">
-                          ({groupSessions.length} murid)
-                        </span>
+                        <span className="text-[11px] text-gray-400">({groupSessions.length} murid)</span>
                       </div>
-                      {/* Students in this slot */}
-                      <div className="space-y-2">
-                        {groupSessions.map((session) => {
-                          const phone = session.students?.phone?.replace(/^0/, "62") || "";
-                          const name = session.students?.full_name || "";
-                          const time = `${formatTime(session.start_time)}-${formatTime(session.end_time)}`;
-                          const todayDate = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
-                          const waText = encodeURIComponent(`Halo ${name}, reminder jadwal renang hari ini:\n\n📅 ${todayDate}\n⏰ ${time}\n\nSampai ketemu di kolam!`);
-                          const waUrl = `https://wa.me/${phone}?text=${waText}`;
-
-                          return (
-                            <div key={session.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <Avatar name={name} size="sm" />
-                                  <p className="text-sm font-semibold text-gray-800">{name}</p>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <a
-                                    href={waUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors"
-                                  >
-                                    <MessageCircle size={16} className="text-emerald-600" />
-                                  </a>
-                                  {session.status === "scheduled" ? (
-                                    <>
-                                      <button
-                                        onClick={() => handleMarkAttendance(session.id, "attended")}
-                                        disabled={actionLoading === session.id}
-                                        className="w-9 h-9 rounded-xl bg-brand-50 hover:bg-brand-100 flex items-center justify-center transition-colors disabled:opacity-50"
-                                      >
-                                        <CheckCircle size={18} className="text-brand-600" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleMarkAttendance(session.id, "absent")}
-                                        disabled={actionLoading === session.id}
-                                        className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors disabled:opacity-50"
-                                      >
-                                        <XCircle size={18} className="text-rose-400" />
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <Badge variant={session.status}>{session.status === "attended" ? "Hadir" : "Absen"}</Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div className="flex flex-wrap gap-2">
+                        {groupSessions.map((session: any) => (
+                          <div key={session.id} className="flex items-center gap-2">
+                            <Avatar name={session.students?.full_name ?? ""} size="sm" />
+                            <span className="text-sm text-gray-700 font-medium">{session.students?.full_name}</span>
+                          </div>
                         ))}
                       </div>
                     </motion.div>

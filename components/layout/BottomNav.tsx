@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, Users, CalendarDays, CreditCard, ClipboardCheck } from "lucide-react";
+import { Home, Users, CalendarDays, ClipboardCheck, Bell } from "lucide-react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 
@@ -11,8 +11,8 @@ const tabs = [
   { href: "/admin", label: "Beranda", icon: Home },
   { href: "/admin/students", label: "Murid", icon: Users },
   { href: "/admin/schedule", label: "Jadwal", icon: CalendarDays },
+  { href: "/admin/reminder", label: "Reminder", icon: Bell },
   { href: "/admin/attendance", label: "Absensi", icon: ClipboardCheck },
-  { href: "/admin/payments", label: "Bayar", icon: CreditCard },
 ];
 
 export default function BottomNav() {
