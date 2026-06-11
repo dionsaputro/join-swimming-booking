@@ -255,10 +255,10 @@ export default function AttendancePage() {
                                         {SESSION_STATUS[session.status as keyof typeof SESSION_STATUS]}
                                       </Badge>
                                       <button
-                                        onClick={() => openNoteModal(session.id, session.status === "attended" ? "absent" : "attended", session.students?.full_name ?? "")}
+                                        onClick={() => openNoteModal(session.id, session.status, session.students?.full_name ?? "")}
                                         disabled={actionLoading === session.id}
                                         className="w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors disabled:opacity-50"
-                                        title="Ubah status"
+                                        title="Edit catatan"
                                       >
                                         <MessageSquare size={12} className="text-gray-400" />
                                       </button>
