@@ -45,7 +45,7 @@ export default function AdminDashboard() {
       const [sessionsRes, tomorrowRes, overdueRes, requestsRes, packagesRes] = await Promise.all([
         supabase
           .from("sessions")
-          .select("*, students(full_name)")
+          .select("*, students(full_name, phone)")
           .eq("scheduled_date", today)
           .neq("status", "rescheduled")
           .order("start_time", { ascending: true }),
@@ -262,37 +262,55 @@ export default function AdminDashboard() {
                       </div>
                       {/* Students in this slot */}
                       <div className="space-y-2">
-                        {groupSessions.map((session) => (
-                          <div key={session.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <Avatar name={session.students?.full_name ?? ""} size="sm" />
-                                <p className="text-sm font-semibold text-gray-800">{session.students?.full_name}</p>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                {session.status === "scheduled" ? (
-                                  <>
-                                    <button
-                                      onClick={() => handleMarkAttendance(session.id, "attended")}
-                                      disabled={actionLoading === session.id}
-                                      className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors disabled:opacity-50"
-                                    >
-                                      <CheckCircle size={18} className="text-emerald-500" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleMarkAttendance(session.id, "absent")}
-                                      disabled={actionLoading === session.id}
-                                      className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors disabled:opacity-50"
-                                    >
-                                      <XCircle size={18} className="text-rose-400" />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <Badge variant={session.status}>{session.status === "attended" ? "Hadir" : "Absen"}</Badge>
-                                )}
+                        {groupSessions.map((session) => {
+                          const phone = session.students?.phone?.replace(/^0/, "62") || "";
+                          const name = session.students?.full_name || "";
+                          const time = `${formatTime(session.start_time)}-${formatTime(session.end_time)}`;
+                          const todayDate = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
+                          const waText = encodeURIComponent(`Halo ${name}, reminder jadwal renang hari ini:\n\n📅 ${todayDate}\n⏰ ${time}\n\nSampai ketemu di kolam!`);
+                          const waUrl = `https://wa.me/${phone}?text=${waText}`;
+
+                          return (
+                            <div key={session.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <Avatar name={name} size="sm" />
+                                  <p className="text-sm font-semibold text-gray-800">{name}</p>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <a
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors"
+                                  >
+                                    <MessageCircle size={16} className="text-emerald-600" />
+                                  </a>
+                                  {session.status === "scheduled" ? (
+                                    <>
+                                      <button
+                                        onClick={() => handleMarkAttendance(session.id, "attended")}
+                                        disabled={actionLoading === session.id}
+                                        className="w-9 h-9 rounded-xl bg-brand-50 hover:bg-brand-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                                      >
+                                        <CheckCircle size={18} className="text-brand-600" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleMarkAttendance(session.id, "absent")}
+                                        disabled={actionLoading === session.id}
+                                        className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                                      >
+                                        <XCircle size={18} className="text-rose-400" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <Badge variant={session.status}>{session.status === "attended" ? "Hadir" : "Absen"}</Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          );
+                        })}
                         ))}
                       </div>
                     </motion.div>
