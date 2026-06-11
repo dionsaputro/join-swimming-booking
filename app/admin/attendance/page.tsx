@@ -11,6 +11,9 @@ import { createClient } from "@/lib/supabase/client";
 import { markAttendance } from "@/lib/actions/attendance";
 import { formatTime } from "@/lib/utils";
 import { SESSION_STATUS, DAYS_OF_WEEK } from "@/lib/constants";
+import Modal from "@/components/ui/Modal";
+import Input from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
 
 const stagger = {
   hidden: { opacity: 0 },
@@ -27,6 +30,13 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
+
+  // Note modal
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteSessionId, setNoteSessionId] = useState("");
+  const [noteStatus, setNoteStatus] = useState<"attended" | "absent">("attended");
+  const [noteText, setNoteText] = useState("");
+  const [noteStudentName, setNoteStudentName] = useState("");
 
   // Calculate week start (Monday) based on offset
   const weekStart = useMemo(() => {
@@ -76,6 +86,27 @@ export default function AttendancePage() {
       setSessions([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function openNoteModal(sessionId: string, status: "attended" | "absent", studentName: string) {
+    setNoteSessionId(sessionId);
+    setNoteStatus(status);
+    setNoteStudentName(studentName);
+    setNoteText("");
+    setShowNoteModal(true);
+  }
+
+  async function handleConfirmAttendance() {
+    setShowNoteModal(false);
+    setActionLoading(noteSessionId);
+    try {
+      await markAttendance(noteSessionId, noteStatus, noteText.trim() || undefined);
+      await fetchSessions();
+    } catch {
+      // silent
+    } finally {
+      setActionLoading(null);
     }
   }
 
@@ -202,14 +233,14 @@ export default function AttendancePage() {
                                   {session.status === "scheduled" && (isPast || isToday) ? (
                                     <>
                                       <button
-                                        onClick={() => handleMarkAttendance(session.id, "attended")}
+                                        onClick={() => openNoteModal(session.id, "attended", session.students?.full_name ?? "")}
                                         disabled={actionLoading === session.id}
                                         className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors disabled:opacity-50"
                                       >
                                         <CheckCircle size={16} className="text-emerald-500" />
                                       </button>
                                       <button
-                                        onClick={() => handleMarkAttendance(session.id, "absent")}
+                                        onClick={() => openNoteModal(session.id, "absent", session.students?.full_name ?? "")}
                                         disabled={actionLoading === session.id}
                                         className="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors disabled:opacity-50"
                                       >
@@ -237,6 +268,24 @@ export default function AttendancePage() {
           </motion.div>
         )}
       </div>
+
+      {/* Note Modal */}
+      <Modal isOpen={showNoteModal} onClose={() => setShowNoteModal(false)} title={noteStatus === "attended" ? "Tandai Hadir" : "Tandai Tidak Hadir"}>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            {noteStudentName} — {noteStatus === "attended" ? "Hadir" : "Tidak Hadir"}
+          </p>
+          <Input
+            label="Catatan (opsional)"
+            placeholder="Contoh: Teknik butterfly sudah improve"
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+          />
+          <Button className="w-full" onClick={handleConfirmAttendance}>
+            Simpan
+          </Button>
+        </div>
+      </Modal>
     </PageTransition>
   );
 }

@@ -248,14 +248,21 @@ export default function StudentPortal() {
                   </div>
                 ) : (
                   sessions.map((s: any) => (
-                    <div key={s.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">
-                          {new Date(s.scheduled_date + "T00:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
-                        </p>
-                        <p className="text-xs text-gray-400">{formatTime(s.start_time)} – {formatTime(s.end_time)}</p>
+                    <div key={s.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">
+                            {new Date(s.scheduled_date + "T00:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
+                          </p>
+                          <p className="text-xs text-gray-400">{formatTime(s.start_time)} – {formatTime(s.end_time)}</p>
+                        </div>
+                        <Badge variant={s.status}>{SESSION_STATUS[s.status as keyof typeof SESSION_STATUS]}</Badge>
                       </div>
-                      <Badge variant={s.status}>{SESSION_STATUS[s.status as keyof typeof SESSION_STATUS]}</Badge>
+                      {s.admin_note && (
+                        <div className="mt-2 px-3 py-2 bg-brand-50 rounded-lg border border-brand-100">
+                          <p className="text-xs text-brand-700">{s.admin_note}</p>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
