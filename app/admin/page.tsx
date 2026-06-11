@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, XCircle, Clock, Calendar, CreditCard } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Calendar, CreditCard, MessageCircle, Bell } from "lucide-react";
 import PageTransition from "@/components/layout/PageTransition";
 import Badge from "@/components/ui/Badge";
 import Avatar from "@/components/ui/Avatar";
@@ -25,6 +25,7 @@ const item = {
 
 export default function AdminDashboard() {
   const [todaySessions, setTodaySessions] = useState<any[]>([]);
+  const [tomorrowSessions, setTomorrowSessions] = useState<any[]>([]);
   const [overdueSessions, setOverdueSessions] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [unpaidPackages, setUnpaidPackages] = useState<any[]>([]);
@@ -39,12 +40,19 @@ export default function AdminDashboard() {
     try {
       const supabase = createClient();
       const today = new Date().toISOString().split("T")[0];
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
-      const [sessionsRes, overdueRes, requestsRes, packagesRes] = await Promise.all([
+      const [sessionsRes, tomorrowRes, overdueRes, requestsRes, packagesRes] = await Promise.all([
         supabase
           .from("sessions")
           .select("*, students(full_name)")
           .eq("scheduled_date", today)
+          .neq("status", "rescheduled")
+          .order("start_time", { ascending: true }),
+        supabase
+          .from("sessions")
+          .select("*, students(full_name, phone)")
+          .eq("scheduled_date", tomorrow)
           .neq("status", "rescheduled")
           .order("start_time", { ascending: true }),
         supabase
@@ -68,6 +76,7 @@ export default function AdminDashboard() {
       ]);
 
       setTodaySessions(sessionsRes.data ?? []);
+      setTomorrowSessions(tomorrowRes.data ?? []);
       setOverdueSessions(overdueRes.data ?? []);
       setPendingRequests(requestsRes.data ?? []);
       setUnpaidPackages(packagesRes.data ?? []);
@@ -144,6 +153,72 @@ export default function AdminDashboard() {
             })}
           </p>
         </div>
+
+        {/* Reminder Besok */}
+        {tomorrowSessions.length > 0 && (
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Bell size={16} className="text-amber-500" />
+              <h2 className="text-sm font-bold text-gray-700">
+                Jadwal Besok ({tomorrowSessions.length})
+              </h2>
+            </div>
+            <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-3">
+              {(() => {
+                // Group by time slot
+                const grouped: Record<string, typeof tomorrowSessions> = {};
+                tomorrowSessions.forEach((session) => {
+                  const key = `${session.start_time}-${session.end_time}`;
+                  if (!grouped[key]) grouped[key] = [];
+                  grouped[key].push(session);
+                });
+                return Object.keys(grouped).sort().map((key) => {
+                  const groupSess = grouped[key];
+                  const first = groupSess[0];
+                  return (
+                    <motion.div key={key} variants={item}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock size={14} className="text-amber-500" />
+                        <span className="text-xs font-bold text-gray-500">
+                          {formatTime(first.start_time)} – {formatTime(first.end_time)}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {groupSess.map((session: any) => {
+                          const phone = session.students?.phone?.replace(/^0/, "62") || "";
+                          const name = session.students?.full_name || "";
+                          const time = `${formatTime(session.start_time)}-${formatTime(session.end_time)}`;
+                          const tomorrow_date = new Date(Date.now() + 86400000).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
+                          const waText = encodeURIComponent(`Halo ${name}, ini reminder jadwal renang kamu besok ya:\n\n📅 ${tomorrow_date}\n⏰ ${time}\n\nSampai ketemu di kolam! 🏊`);
+                          const waUrl = `https://wa.me/${phone}?text=${waText}`;
+
+                          return (
+                            <div key={session.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <Avatar name={name} size="sm" />
+                                  <p className="text-sm font-semibold text-gray-800">{name}</p>
+                                </div>
+                                <a
+                                  href={waUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors"
+                                >
+                                  <MessageCircle size={18} className="text-emerald-600" />
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  );
+                });
+              })()}
+            </motion.div>
+          </section>
+        )}
 
         {/* Jadwal Hari Ini */}
         <section>
