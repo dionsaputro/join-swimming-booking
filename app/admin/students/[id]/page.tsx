@@ -11,6 +11,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import CurrencyInput from "@/components/ui/CurrencyInput";
 import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { createPackage, convertTrialToPackage } from "@/lib/actions/packages";
@@ -669,7 +670,7 @@ export default function StudentDetailPage() {
           </div>
 
           {/* Amount */}
-          <Input label="Nominal (Rp)" type="number" placeholder="400000" value={pvtAmount} onChange={(e) => setPvtAmount(e.target.value)} />
+          <CurrencyInput label="Nominal (Rp)" value={pvtAmount} onChange={(val) => setPvtAmount(val)} placeholder="400.000" />
 
           {pvtError && <p className="text-xs text-rose-500 font-medium">{pvtError}</p>}
           <Button className="w-full" onClick={handleCreatePrivate} isLoading={pvtCreating}>Buat Paket Private</Button>
@@ -726,7 +727,7 @@ export default function StudentDetailPage() {
             </select>
           </div>
           <Input label="Tanggal Mulai" type="date" value={pkgStartDate} onChange={(e) => setPkgStartDate(e.target.value)} />
-          <Input label="Nominal (Rp)" type="number" placeholder="400000" value={pkgAmount} onChange={(e) => setPkgAmount(e.target.value)} />
+          <CurrencyInput label="Nominal (Rp)" value={pkgAmount} onChange={(val) => setPkgAmount(val)} placeholder="400.000" />
           {pkgError && <p className="text-xs text-rose-500 font-medium">{pkgError}</p>}
           <Button className="w-full" onClick={handleCreatePackage} isLoading={pkgCreating}>Buat Paket</Button>
         </div>
@@ -751,7 +752,7 @@ export default function StudentDetailPage() {
             </select>
           </div>
           <Input label="Tanggal Mulai" type="date" value={convertStartDate} onChange={(e) => setConvertStartDate(e.target.value)} />
-          <Input label="Nominal (Rp)" type="number" placeholder="400000" value={convertAmount} onChange={(e) => setConvertAmount(e.target.value)} />
+          <CurrencyInput label="Nominal (Rp)" value={convertAmount} onChange={(val) => setConvertAmount(val)} placeholder="400.000" />
           {convertError && <p className="text-xs text-rose-500 font-medium">{convertError}</p>}
           <Button className="w-full" onClick={handleConvert} isLoading={converting}>Convert ke Paket</Button>
         </div>
