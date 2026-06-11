@@ -27,7 +27,8 @@ export default function AdminDashboard() {
   const [tomorrowSessions, setTomorrowSessions] = useState<any[]>([]);
   const [overdueSessions, setOverdueSessions] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
-  const [unpaidPackages, setUnpaidPackages] = useState<any[]>([]);
+  const [allPackages, setAllPackages] = useState<any[]>([]);
+  const [payFilter, setPayFilter] = useState<"unpaid" | "paid" | "all">("unpaid");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -69,8 +70,7 @@ export default function AdminDashboard() {
         supabase
           .from("packages")
           .select("*, students(full_name)")
-          .eq("is_paid", false)
-          .eq("status", "active")
+          .order("is_paid", { ascending: true })
           .order("created_at", { ascending: false }),
       ]);
 
@@ -78,7 +78,7 @@ export default function AdminDashboard() {
       setTomorrowSessions(tomorrowRes.data ?? []);
       setOverdueSessions(overdueRes.data ?? []);
       setPendingRequests(requestsRes.data ?? []);
-      setUnpaidPackages(packagesRes.data ?? []);
+      setAllPackages(packagesRes.data ?? []);
     } catch {
       // silent
     } finally {
@@ -345,22 +345,46 @@ export default function AdminDashboard() {
           </motion.div>
         </section>
 
-        {/* Belum Lunas */}
+        {/* Pembayaran */}
         <section>
           <div className="flex items-center gap-2 mb-3">
-            <CreditCard size={16} className="text-rose-400" />
-            <h2 className="text-sm font-bold text-gray-700">
-              Belum Lunas ({unpaidPackages.length})
-            </h2>
+            <CreditCard size={16} className="text-brand-600" />
+            <h2 className="text-sm font-bold text-gray-700">Pembayaran</h2>
           </div>
-          <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-3">
-            {unpaidPackages.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-10">
-                <CreditCard size={24} className="text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">Semua pembayaran lunas</p>
-              </div>
-            ) : (
-              unpaidPackages.map((pkg) => (
+          <div className="flex gap-2 mb-3">
+            {[
+              { key: "unpaid", label: "Belum Lunas" },
+              { key: "paid", label: "Lunas" },
+              { key: "all", label: "Semua" },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setPayFilter(f.key as typeof payFilter)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                  payFilter === f.key ? "bg-brand-600 text-white" : "bg-white text-gray-500 border border-gray-100"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
+            {(() => {
+              const filtered = allPackages.filter((pkg) => {
+                if (payFilter === "unpaid") return !pkg.is_paid;
+                if (payFilter === "paid") return pkg.is_paid;
+                return true;
+              });
+              if (filtered.length === 0) {
+                return (
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-8">
+                    <p className="text-sm text-gray-400">
+                      {payFilter === "unpaid" ? "Semua pembayaran lunas" : "Tidak ada data"}
+                    </p>
+                  </div>
+                );
+              }
+              return filtered.map((pkg: any) => (
                 <motion.div key={pkg.id} variants={item} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -368,17 +392,23 @@ export default function AdminDashboard() {
                       <div>
                         <p className="text-sm font-semibold text-gray-800">{pkg.students?.full_name}</p>
                         <p className="text-xs text-gray-400 font-medium">
-                          {pkg.session_type === "trial" ? "Trial" : "Paket"} · Rp{pkg.amount.toLocaleString("id-ID")}
+                          {pkg.session_type === "trial" ? "Trial" : "Paket"} · Rp{pkg.amount?.toLocaleString("id-ID")}
                         </p>
                       </div>
                     </div>
-                    <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">
-                      Belum Lunas
-                    </span>
+                    {pkg.is_paid ? (
+                      <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                        Lunas
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">
+                        Belum Lunas
+                      </span>
+                    )}
                   </div>
                 </motion.div>
-              ))
-            )}
+              ));
+            })()}
           </motion.div>
         </section>
       </div>
