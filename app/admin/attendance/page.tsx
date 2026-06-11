@@ -230,7 +230,7 @@ export default function AttendancePage() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                  {session.status === "scheduled" ? (
+                                  {session.status === "scheduled" && isPast ? (
                                     <>
                                       <button
                                         onClick={() => openNoteModal(session.id, "attended", session.students?.full_name ?? "")}
@@ -247,21 +247,21 @@ export default function AttendancePage() {
                                         <XCircle size={16} className="text-rose-400" />
                                       </button>
                                     </>
+                                  ) : session.status === "scheduled" ? (
+                                    <Badge variant="scheduled">Terjadwal</Badge>
                                   ) : (
                                     <div className="flex items-center gap-1.5">
                                       <Badge variant={session.status}>
                                         {SESSION_STATUS[session.status as keyof typeof SESSION_STATUS]}
                                       </Badge>
-                                      {(isPast || isToday) && (
-                                        <button
-                                          onClick={() => openNoteModal(session.id, session.status === "attended" ? "absent" : "attended", session.students?.full_name ?? "")}
-                                          disabled={actionLoading === session.id}
-                                          className="w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors disabled:opacity-50"
-                                          title="Ubah status"
-                                        >
-                                          <MessageSquare size={12} className="text-gray-400" />
-                                        </button>
-                                      )}
+                                      <button
+                                        onClick={() => openNoteModal(session.id, session.status === "attended" ? "absent" : "attended", session.students?.full_name ?? "")}
+                                        disabled={actionLoading === session.id}
+                                        className="w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                                        title="Ubah status"
+                                      >
+                                        <MessageSquare size={12} className="text-gray-400" />
+                                      </button>
                                     </div>
                                   )}
                                 </div>
