@@ -61,7 +61,15 @@ export default function ReminderPage() {
     const phone = session.students?.phone?.replace(/^0/, "62") || "";
     const name = session.students?.full_name || "";
     const time = `${formatTime(session.start_time)} - ${formatTime(session.end_time)}`;
-    const text = encodeURIComponent(`Halo ${name}, reminder jadwal renang kamu ${dateLabel}:\n\n${dateLabel === "hari ini" ? "📅 Hari ini" : "📅 Besok"}\n⏰ ${time}\n\nSampai ketemu di kolam!`);
+    const text = encodeURIComponent(
+      `Halo ${name}, reminder jadwal renang kamu ${dateLabel}:\n\n` +
+      `${dateLabel === "hari ini" ? "📅 Hari ini" : "📅 Besok"}\n` +
+      `⏰ ${time}\n\n` +
+      `Kamu juga bisa cek jadwal lengkap di:\n` +
+      `https://join-swimming.vercel.app/p\n` +
+      `(masukkan 4 digit terakhir nomor HP kamu)\n\n` +
+      `Kalau ada jadwal yang salah, tolong kabari ya. Terima kasih!`
+    );
     return `https://wa.me/${phone}?text=${text}`;
   }
 
