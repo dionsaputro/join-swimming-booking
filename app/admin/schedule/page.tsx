@@ -116,11 +116,12 @@ export default function SchedulePage() {
     const coveredSessionIds = new Set<string>();
 
     const slotData = daySlots.map((slot) => {
-      const slotSess = groupSessions.filter((s: any) =>
-        s.slot_id === slot.id || (s.start_time === slot.start_time && s.end_time === slot.end_time)
+      // Match sessions by actual time only (not slot_id) to avoid duplicates after edits
+      const slotSessions = groupSessions.filter((s: any) =>
+        s.start_time === slot.start_time && s.end_time === slot.end_time
       );
-      slotSess.forEach((s: any) => coveredSessionIds.add(s.id));
-      return { ...slot, slotSessions: slotSess, isVirtual: false };
+      slotSessions.forEach((s: any) => coveredSessionIds.add(s.id));
+      return { ...slot, slotSessions: slotSessions, isVirtual: false };
     });
 
     const uncovered = groupSessions.filter((s: any) => !coveredSessionIds.has(s.id));

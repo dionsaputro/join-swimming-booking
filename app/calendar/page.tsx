@@ -100,9 +100,9 @@ export default function PublicCalendarPage() {
     const coveredSessionIds = new Set<string>();
 
     const slotData = daySlots.map((slot) => {
-      // Match sessions to slot by EITHER slot_id OR matching time on this date
+      // Match sessions by actual time only to avoid duplicates after edits
       const slotSessions = selectedSessions.filter((s) => 
-        s.slot_id === slot.id || (s.start_time === slot.start_time && s.end_time === slot.end_time)
+        s.start_time === slot.start_time && s.end_time === slot.end_time
       );
       slotSessions.forEach((s) => coveredSessionIds.add(s.id));
       return { ...slot, slotSessions, isVirtual: false };
