@@ -76,13 +76,10 @@ export default function StudentDetailPage() {
 
   // Private Session Modal
   const [showPrivateModal, setShowPrivateModal] = useState(false);
-  const [pvtType, setPvtType] = useState<"trial" | "paket">("paket");
-  const [pvtSessions, setPvtSessions] = useState<Array<{ date: string; start_time: string; end_time: string }>>([
-    { date: "", start_time: "", end_time: "" },
-    { date: "", start_time: "", end_time: "" },
-    { date: "", start_time: "", end_time: "" },
-    { date: "", start_time: "", end_time: "" },
-  ]);
+  const [pvtType, setPvtType] = useState<"trial" | "paket" | "paket8">("paket");
+  const [pvtSessions, setPvtSessions] = useState<Array<{ date: string; start_time: string; end_time: string }>>(
+    Array.from({ length: 8 }, () => ({ date: "", start_time: "", end_time: "" }))
+  );
   const [pvtAmount, setPvtAmount] = useState("");
   const [pvtError, setPvtError] = useState("");
   const [pvtCreating, setPvtCreating] = useState(false);
@@ -236,7 +233,7 @@ export default function StudentDetailPage() {
   }
 
   async function handleCreatePrivate() {
-    const count = pvtType === "trial" ? 1 : 4;
+    const count = pvtType === "trial" ? 1 : pvtType === "paket8" ? 8 : 4;
     const sessionsToUse = pvtSessions.slice(0, count);
 
     // Validate
@@ -296,12 +293,7 @@ export default function StudentDetailPage() {
 
   function resetPrivateForm() {
     setPvtType("paket");
-    setPvtSessions([
-      { date: "", start_time: "", end_time: "" },
-      { date: "", start_time: "", end_time: "" },
-      { date: "", start_time: "", end_time: "" },
-      { date: "", start_time: "", end_time: "" },
-    ]);
+    setPvtSessions(Array.from({ length: 8 }, () => ({ date: "", start_time: "", end_time: "" })));
     setPvtAmount("");
     setPvtError("");
   }
@@ -611,8 +603,8 @@ export default function StudentDetailPage() {
           {/* Type */}
           <div className="space-y-1.5">
             <label className="block text-sm font-semibold text-gray-700">Tipe</label>
-            <div className="flex gap-2">
-              {(["trial", "paket"] as const).map((type) => (
+            <div className="flex gap-2 flex-wrap">
+              {(["trial", "paket", "paket8"] as const).map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -621,16 +613,16 @@ export default function StudentDetailPage() {
                     pvtType === type ? "bg-brand-600 text-white" : "bg-gray-50 text-gray-500 border border-gray-200"
                   }`}
                 >
-                  {type === "trial" ? "Trial (1 sesi)" : "Paket (4 sesi)"}
+                  {type === "trial" ? "Trial (1)" : type === "paket" ? "Paket (4)" : "Paket (8)"}
                 </button>
               ))}
             </div>
           </div>
 
           {/* Sessions */}
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[40vh] overflow-y-auto">
             <label className="block text-sm font-semibold text-gray-700">Jadwal Sesi</label>
-            {Array.from({ length: pvtType === "trial" ? 1 : 4 }).map((_, idx) => (
+            {Array.from({ length: pvtType === "trial" ? 1 : pvtType === "paket8" ? 8 : 4 }).map((_, idx) => (
               <div key={idx} className="bg-gray-50 rounded-xl p-3 space-y-2">
                 <p className="text-[11px] font-bold text-gray-500">Sesi {idx + 1}</p>
                 <input
@@ -639,6 +631,17 @@ export default function StudentDetailPage() {
                   onChange={(e) => {
                     const updated = [...pvtSessions];
                     updated[idx] = { ...updated[idx], date: e.target.value };
+                    // Auto-fill subsequent dates (+7 days each)
+                    const count = pvtType === "trial" ? 1 : pvtType === "paket8" ? 8 : 4;
+                    if (idx === 0 && e.target.value) {
+                      for (let i = 1; i < count; i++) {
+                        if (!updated[i]?.date) {
+                          const nextDate = new Date(e.target.value);
+                          nextDate.setDate(nextDate.getDate() + 7 * i);
+                          updated[i] = { ...updated[i], date: nextDate.toISOString().split("T")[0] };
+                        }
+                      }
+                    }
                     setPvtSessions(updated);
                   }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
@@ -649,10 +652,27 @@ export default function StudentDetailPage() {
                     value={pvtSessions[idx]?.start_time || ""}
                     onChange={(e) => {
                       const updated = [...pvtSessions];
-                      updated[idx] = { ...updated[idx], start_time: e.target.value };
+                      const startVal = e.target.value;
+                      updated[idx] = { ...updated[idx], start_time: startVal };
+                      // Auto-fill end_time (+1 hour)
+                      if (startVal) {
+                        const [h, m] = startVal.split(":").map(Number);
+                        const endH = String(Math.min(h + 1, 23)).padStart(2, "0");
+                        updated[idx].end_time = `${endH}:${String(m).padStart(2, "0")}`;
+                      }
+                      // Auto-fill subsequent sessions with same time
+                      const count = pvtType === "trial" ? 1 : pvtType === "paket8" ? 8 : 4;
+                      if (idx === 0 && startVal) {
+                        for (let i = 1; i < count; i++) {
+                          if (!updated[i]?.start_time) {
+                            updated[i] = { ...updated[i], start_time: updated[0].start_time, end_time: updated[0].end_time };
+                          }
+                        }
+                      }
                       setPvtSessions(updated);
                     }}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    placeholder="Mulai"
                   />
                   <input
                     type="time"
@@ -663,6 +683,7 @@ export default function StudentDetailPage() {
                       setPvtSessions(updated);
                     }}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    placeholder="Selesai"
                   />
                 </div>
               </div>

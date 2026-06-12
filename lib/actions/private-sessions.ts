@@ -12,13 +12,13 @@ interface PrivateSessionSchedule {
 
 export async function createPrivatePackage(formData: {
   student_id: string;
-  session_type: "trial" | "paket";
+  session_type: "trial" | "paket" | "paket8";
   sessions: PrivateSessionSchedule[];
   amount: number;
 }) {
   const supabase = createClient();
 
-  const totalSessions = formData.session_type === "trial" ? 1 : 4;
+  const totalSessions = formData.session_type === "trial" ? 1 : formData.session_type === "paket8" ? 8 : 4;
 
   if (formData.sessions.length !== totalSessions) {
     throw new Error(`Harus ada ${totalSessions} sesi untuk tipe ${formData.session_type}`);
@@ -54,7 +54,7 @@ export async function createPrivatePackage(formData: {
     .from("packages")
     .insert({
       student_id: formData.student_id,
-      session_type: formData.session_type,
+      session_type: formData.session_type === "trial" ? "trial" : "paket",
       total_sessions: totalSessions,
       used_sessions: 0,
       start_date: startDate,
