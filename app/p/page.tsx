@@ -155,7 +155,7 @@ export default function StudentPortal() {
             <div className="inline-flex w-20 h-20 rounded-2xl items-center justify-center mb-4">
               <Image src="/logo.png" alt="Join Swimming" width={80} height={80} className="rounded-2xl" />
             </div>
-            <h1 className="font-display text-2xl text-gray-900">Portal Murid</h1>
+            <h1 className="font-display text-2xl text-gray-900">Portal Les Renang</h1>
             <p className="text-sm text-gray-500 mt-2">Masukkan 4 digit terakhir nomor HP kamu</p>
           </div>
 
