@@ -230,7 +230,7 @@ export default function AttendancePage() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                  {session.status === "scheduled" && isPast ? (
+                                  {session.status === "scheduled" && (isPast || isToday) ? (
                                     <>
                                       <button
                                         onClick={() => openNoteModal(session.id, "attended", session.students?.full_name ?? "")}
