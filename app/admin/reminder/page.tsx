@@ -57,24 +57,24 @@ export default function ReminderPage() {
     fetchData();
   }, []);
 
-  function buildWaUrl(session: any, dateLabel: string) {
+  function buildWaUrl(session: any, dateLabel: string, dateStr: string) {
     const phone = session.students?.phone?.replace(/^0/, "62") || "";
     const name = session.students?.full_name || "";
     const time = `${formatTime(session.start_time)} - ${formatTime(session.end_time)}`;
     const text = encodeURIComponent(
-      `Halo ${name}, reminder jadwal renang kamu ${dateLabel}:\n\n` +
-      `${dateLabel === "hari ini" ? "📅 Hari ini" : "📅 Besok"}\n` +
-      `⏰ ${time}\n\n` +
+      `Halo ${name}, reminder jadwal renang kamu ${dateLabel} (${dateStr}):\n\n` +
+      `Tanggal: ${dateStr}\n` +
+      `Jam: ${time}\n\n` +
       `Kamu juga bisa cek jadwal lengkap di:\n` +
       `https://join-swimming.vercel.app/p\n` +
       `(masukkan 4 digit terakhir nomor HP kamu)\n\n` +
       `Kalau ada jadwal yang salah, tolong kabari ya. Terima kasih!\n\n` +
-      `Sampai jumpa di kolam! 🏊`
+      `Sampai jumpa di kolam!`
     );
     return `https://wa.me/${phone}?text=${text}`;
   }
 
-  function renderSessionGroup(sessions: any[], dateLabel: string) {
+  function renderSessionGroup(sessions: any[], dateLabel: string, dateStr: string) {
     if (sessions.length === 0) {
       return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-8">
@@ -117,7 +117,7 @@ export default function ReminderPage() {
                         </div>
                       </div>
                       <a
-                        href={buildWaUrl(session, dateLabel)}
+                        href={buildWaUrl(session, dateLabel, dateStr)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-10 h-10 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors"
@@ -159,8 +159,11 @@ export default function ReminderPage() {
             <h2 className="text-sm font-bold text-gray-700">
               Hari Ini ({todaySessions.length})
             </h2>
+            <span className="text-xs text-gray-400 font-medium">
+              {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long" })}
+            </span>
           </div>
-          {renderSessionGroup(todaySessions, "hari ini")}
+          {renderSessionGroup(todaySessions, "hari ini", new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" }))}
         </section>
 
         {/* Tomorrow */}
@@ -170,8 +173,11 @@ export default function ReminderPage() {
             <h2 className="text-sm font-bold text-gray-700">
               Besok ({tomorrowSessions.length})
             </h2>
+            <span className="text-xs text-gray-400 font-medium">
+              {new Date(Date.now() + 86400000).toLocaleDateString("id-ID", { day: "numeric", month: "long" })}
+            </span>
           </div>
-          {renderSessionGroup(tomorrowSessions, "besok")}
+          {renderSessionGroup(tomorrowSessions, "besok", new Date(Date.now() + 86400000).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" }))}
         </section>
       </div>
     </PageTransition>
