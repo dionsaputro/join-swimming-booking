@@ -10,6 +10,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { markAttendance } from "@/lib/actions/attendance";
 import { approveReschedule, rejectReschedule } from "@/lib/actions/reschedule";
+import { markAsPaid } from "@/lib/actions/payments";
 import { formatTime } from "@/lib/utils";
 
 const stagger = {
@@ -397,13 +398,34 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     {pkg.is_paid ? (
-                      <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                      <button
+                        onClick={async () => {
+                          setActionLoading(pkg.id);
+                          try {
+                            const supabase = createClient();
+                            await supabase.from("packages").update({ is_paid: false, paid_at: null } as Record<string, unknown>).eq("id", pkg.id);
+                            fetchData();
+                          } finally { setActionLoading(null); }
+                        }}
+                        disabled={actionLoading === pkg.id}
+                        className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                      >
                         Lunas
-                      </span>
+                      </button>
                     ) : (
-                      <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">
+                      <button
+                        onClick={async () => {
+                          setActionLoading(pkg.id);
+                          try {
+                            await markAsPaid(pkg.id, pkg.amount);
+                            fetchData();
+                          } finally { setActionLoading(null); }
+                        }}
+                        disabled={actionLoading === pkg.id}
+                        className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-100 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                      >
                         Belum Lunas
-                      </span>
+                      </button>
                     )}
                   </div>
                 </motion.div>
