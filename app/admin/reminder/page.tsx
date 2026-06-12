@@ -68,7 +68,8 @@ export default function ReminderPage() {
       `Kamu juga bisa cek jadwal lengkap di:\n` +
       `https://join-swimming.vercel.app/p\n` +
       `(masukkan 4 digit terakhir nomor HP kamu)\n\n` +
-      `Kalau ada jadwal yang salah, tolong kabari ya. Terima kasih!`
+      `Kalau ada jadwal yang salah, tolong kabari ya. Terima kasih!\n\n` +
+      `Sampai jumpa di kolam! 🏊`
     );
     return `https://wa.me/${phone}?text=${text}`;
   }
