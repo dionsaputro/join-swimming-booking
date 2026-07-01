@@ -63,3 +63,63 @@ export async function updateSessionNote(sessionId: string, note: string) {
   if (error) throw error;
   revalidatePath("/admin/attendance");
 }
+
+/**
+ * Change attendance status on an already-marked session.
+ * Handles used_sessions increment/decrement on the package.
+ */
+export async function changeAttendanceStatus(
+  sessionId: string,
+  newStatus: "attended" | "absent" | "scheduled"
+) {
+  const supabase = createClient();
+
+  // Get current session to know old status & package
+  const { data: session, error: fetchErr } = await supabase
+    .from("sessions")
+    .select("status, package_id")
+    .eq("id", sessionId)
+    .single();
+
+  if (fetchErr || !session) throw fetchErr || new Error("Session not found");
+
+  const oldStatus = session.status;
+  if (oldStatus === newStatus) return; // noop
+
+  // Update session status
+  const { error } = await supabase
+    .from("sessions")
+    .update({ status: newStatus })
+    .eq("id", sessionId);
+
+  if (error) throw error;
+
+  // Adjust used_sessions on package
+  // attended counts as +1, anything else is 0
+  const wasCounted = oldStatus === "attended";
+  const willCount = newStatus === "attended";
+
+  if (wasCounted !== willCount && session.package_id) {
+    const { data: pkg } = await supabase
+      .from("packages")
+      .select("used_sessions, total_sessions")
+      .eq("id", session.package_id)
+      .single();
+
+    if (pkg) {
+      const delta = willCount ? 1 : -1;
+      const newUsed = Math.max(0, pkg.used_sessions + delta);
+      await supabase
+        .from("packages")
+        .update({
+          used_sessions: newUsed,
+          status: newUsed >= pkg.total_sessions ? "completed" : "active",
+        })
+        .eq("id", session.package_id);
+    }
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/attendance");
+  revalidatePath("/admin/students");
+}

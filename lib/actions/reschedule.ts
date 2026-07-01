@@ -38,25 +38,7 @@ export async function createRescheduleRequest(formData: {
   if (session.status !== "scheduled") throw new Error("Sesi ini tidak bisa direschedule");
   if (session.reschedule_from !== null) throw new Error("Sesi ini sudah pernah direschedule");
 
-  // Check slot capacity on requested date
-  const { data: slot } = await supabase
-    .from("slots")
-    .select("max_capacity")
-    .eq("id", formData.requested_slot_id)
-    .single();
-
-  if (!slot) throw new Error("Slot tidak ditemukan");
-
-  const { count } = await supabase
-    .from("sessions")
-    .select("*", { count: "exact", head: true })
-    .eq("slot_id", formData.requested_slot_id)
-    .eq("scheduled_date", formData.requested_date)
-    .neq("status", "rescheduled");
-
-  if ((count ?? 0) >= slot.max_capacity) {
-    throw new Error("Slot sudah penuh pada tanggal yang dipilih");
-  }
+  // ponytail: capacity check disabled — slots can't be full for now
 
   // Check no existing pending request for this session
   const { count: existingCount } = await supabase
@@ -116,17 +98,7 @@ export async function approveReschedule(requestId: string) {
 
   if (!slot) throw new Error("Slot tidak ditemukan");
 
-  // Check capacity again
-  const { count } = await supabase
-    .from("sessions")
-    .select("*", { count: "exact", head: true })
-    .eq("slot_id", request.requested_slot_id)
-    .eq("scheduled_date", request.requested_date)
-    .neq("status", "rescheduled");
-
-  if ((count ?? 0) >= slot.max_capacity) {
-    throw new Error("Slot sudah penuh. Tidak bisa approve.");
-  }
+  // ponytail: capacity check disabled — slots can't be full for now
 
   // Mark original session as rescheduled
   await supabase
@@ -193,17 +165,7 @@ export async function adminReschedule(formData: {
 
   if (!slot) throw new Error("Slot tidak ditemukan");
 
-  // Check capacity
-  const { count } = await supabase
-    .from("sessions")
-    .select("*", { count: "exact", head: true })
-    .eq("slot_id", formData.new_slot_id)
-    .eq("scheduled_date", formData.new_date)
-    .neq("status", "rescheduled");
-
-  if ((count ?? 0) >= slot.max_capacity) {
-    throw new Error("Slot sudah penuh pada tanggal yang dipilih");
-  }
+  // ponytail: capacity check disabled — slots can't be full for now
 
   // Check date is within package end_date
   const { data: pkg } = await supabase

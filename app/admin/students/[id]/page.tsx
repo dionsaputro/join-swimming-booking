@@ -489,7 +489,8 @@ export default function StudentDetailPage() {
                 const today = new Date().toISOString().split("T")[0];
                 const isPast = session.scheduled_date < today;
                 const canMarkAttendance = session.status === "scheduled" && isPast;
-                const canEdit = session.status === "scheduled";
+                // ponytail: allow edit for attended/absent too, only rescheduled is locked
+                const canEdit = session.status !== "rescheduled";
 
                 return (
                   <motion.div

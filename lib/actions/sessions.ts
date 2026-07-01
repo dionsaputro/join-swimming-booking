@@ -86,28 +86,7 @@ export async function updateSession(
 ) {
   const supabase = createClient();
 
-  // If changing to a regular slot, check capacity
-  if (formData.slot_id && formData.scheduled_date) {
-    const { data: slot } = await supabase
-      .from("slots")
-      .select("max_capacity")
-      .eq("id", formData.slot_id)
-      .single();
-
-    if (slot) {
-      const { count } = await supabase
-        .from("sessions")
-        .select("*", { count: "exact", head: true })
-        .eq("slot_id", formData.slot_id)
-        .eq("scheduled_date", formData.scheduled_date)
-        .neq("status", "rescheduled")
-        .neq("id", sessionId);
-
-      if ((count ?? 0) >= slot.max_capacity) {
-        throw new Error("Slot sudah penuh pada tanggal tersebut");
-      }
-    }
-  }
+  // ponytail: capacity check disabled — slots can't be full for now
 
   const { error } = await supabase
     .from("sessions")

@@ -56,20 +56,7 @@ export async function createPackage(formData: {
     }
   }
 
-  // Check capacity for each date
-  for (const date of sessionDates) {
-    const { count, error: countError } = await supabase
-      .from("sessions")
-      .select("*", { count: "exact", head: true })
-      .eq("slot_id", formData.slot_id)
-      .eq("scheduled_date", date)
-      .neq("status", "rescheduled");
-
-    if (countError) throw countError;
-    if ((count ?? 0) >= slot.max_capacity) {
-      throw new Error(`Slot penuh pada tanggal ${date}. Pilih tanggal lain.`);
-    }
-  }
+  // ponytail: capacity check disabled — slots can't be full for now
 
   // Create package
   const { data: pkg, error: pkgError } = await supabase

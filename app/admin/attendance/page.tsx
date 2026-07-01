@@ -8,7 +8,7 @@ import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
-import { markAttendance } from "@/lib/actions/attendance";
+import { markAttendance, changeAttendanceStatus } from "@/lib/actions/attendance";
 import { formatTime } from "@/lib/utils";
 import { SESSION_STATUS, DAYS_OF_WEEK } from "@/lib/constants";
 import Modal from "@/components/ui/Modal";
@@ -27,6 +27,7 @@ const item = {
 
 export default function AttendancePage() {
   const [sessions, setSessions] = useState<any[]>([]);
+  const [sessionPositions, setSessionPositions] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -74,16 +75,40 @@ export default function AttendancePage() {
 
       const { data } = await supabase
         .from("sessions")
-        .select("*, students(full_name, level)")
+        .select("*, students(full_name, level), packages(used_sessions, total_sessions)")
         .gte("scheduled_date", startDate)
         .lte("scheduled_date", endDate)
         .neq("status", "rescheduled")
         .order("scheduled_date", { ascending: true })
         .order("start_time", { ascending: true });
 
-      setSessions(data ?? []);
+      const weekSessions = data ?? [];
+      setSessions(weekSessions);
+
+      // Compute position of each session within its package (ordered by date)
+      const packageIds = Array.from(new Set(weekSessions.map((s) => s.package_id).filter(Boolean)));
+      if (packageIds.length > 0) {
+        const { data: allPkgSessions } = await supabase
+          .from("sessions")
+          .select("id, package_id, scheduled_date")
+          .in("package_id", packageIds)
+          .neq("status", "rescheduled")
+          .order("scheduled_date", { ascending: true })
+          .order("start_time", { ascending: true });
+
+        const positions: Record<string, number> = {};
+        const counters: Record<string, number> = {};
+        (allPkgSessions ?? []).forEach((s) => {
+          counters[s.package_id] = (counters[s.package_id] || 0) + 1;
+          positions[s.id] = counters[s.package_id];
+        });
+        setSessionPositions(positions);
+      } else {
+        setSessionPositions({});
+      }
     } catch {
       setSessions([]);
+      setSessionPositions({});
     } finally {
       setLoading(false);
     }
@@ -114,6 +139,18 @@ export default function AttendancePage() {
     setActionLoading(sessionId);
     try {
       await markAttendance(sessionId, status);
+      await fetchSessions();
+    } catch {
+      // silent
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleChangeStatus(sessionId: string, newStatus: "attended" | "absent" | "scheduled") {
+    setActionLoading(sessionId);
+    try {
+      await changeAttendanceStatus(sessionId, newStatus);
       await fetchSessions();
     } catch {
       // silent
@@ -220,13 +257,27 @@ export default function AttendancePage() {
                                 <div className="flex items-center gap-3">
                                   <Avatar name={session.students?.full_name ?? ""} size="sm" />
                                   <div>
-                                    <p className="text-sm font-semibold text-gray-800">{session.students?.full_name}</p>
-                                    {session.admin_note && (
-                                      <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                        <MessageSquare size={10} />
-                                        {session.admin_note}
-                                      </p>
-                                    )}
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="text-sm font-semibold text-gray-800">{session.students?.full_name}</p>
+                                      {!session.slot_id && (
+                                        <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">
+                                          Private
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      {session.packages && sessionPositions[session.id] && (
+                                        <span className="text-[11px] text-gray-400 font-medium">
+                                          Sesi {sessionPositions[session.id]}/{session.packages.total_sessions}
+                                        </span>
+                                      )}
+                                      {session.admin_note && (
+                                        <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                                          <MessageSquare size={10} />
+                                          {session.admin_note}
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1.5">
@@ -251,6 +302,26 @@ export default function AttendancePage() {
                                     <Badge variant="scheduled">Terjadwal</Badge>
                                   ) : (
                                     <div className="flex items-center gap-1.5">
+                                      {/* Toggle: switch to the opposite status */}
+                                      {session.status === "attended" ? (
+                                        <button
+                                          onClick={() => handleChangeStatus(session.id, "absent")}  
+                                          disabled={actionLoading === session.id}
+                                          className="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                                          title="Ubah jadi Tidak Hadir"
+                                        >
+                                          <XCircle size={16} className="text-rose-400" />
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleChangeStatus(session.id, "attended")}
+                                          disabled={actionLoading === session.id}
+                                          className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors disabled:opacity-50"
+                                          title="Ubah jadi Hadir"
+                                        >
+                                          <CheckCircle size={16} className="text-emerald-500" />
+                                        </button>
+                                      )}
                                       <Badge variant={session.status}>
                                         {SESSION_STATUS[session.status as keyof typeof SESSION_STATUS]}
                                       </Badge>
