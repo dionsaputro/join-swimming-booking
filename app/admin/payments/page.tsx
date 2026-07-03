@@ -11,6 +11,7 @@ import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { markAsPaid } from "@/lib/actions/payments";
+import { openInvoice } from "@/lib/invoice";
 
 const stagger = {
   hidden: { opacity: 0 },
@@ -82,92 +83,14 @@ export default function PaymentsPage() {
   }
 
   function downloadInvoice(pkg: any) {
-    const paidDate = pkg.paid_at
-      ? new Date(pkg.paid_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
-      : "-";
-    const studentName = pkg.students?.full_name ?? "-";
-    const isPrivate = pkg.sessions?.every((s: any) => s.slot_id === null);
-    const sessionLabel = isPrivate
-      ? `Private Renang (${pkg.total_sessions}) pertemuan`
-      : `Group Renang (${pkg.total_sessions}) pertemuan`;
-    const amount = `Rp${pkg.amount.toLocaleString("id-ID")}`;
-    const invoiceNo = `INV-${pkg.id.slice(0, 8).toUpperCase()}`;
-
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Invoice ${invoiceNo}</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 60px; color: #1a1a1a; max-width: 720px; margin: 0 auto; }
-  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 48px; padding-bottom: 32px; border-bottom: 2px solid #f3f4f6; }
-  .logo { height: 72px; width: auto; }
-  .header-right { text-align: right; }
-  .invoice-title { font-size: 32px; font-weight: 800; color: #111827; letter-spacing: -0.02em; }
-  .invoice-no { font-size: 13px; color: #6b7280; margin-top: 6px; font-weight: 500; }
-  .meta { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-  .meta-left {}
-  .meta-right { text-align: right; }
-  .label { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
-  .value { font-size: 15px; color: #1f2937; font-weight: 500; line-height: 1.5; }
-  .paid-row { text-align: right; margin-bottom: 48px; }
-  .paid-badge { display: inline-block; background: #ecfdf5; color: #059669; font-size: 12px; font-weight: 800; padding: 6px 16px; border-radius: 10px; border: 1.5px solid #a7f3d0; letter-spacing: 0.04em; }
-  .divider { height: 1px; background: #e5e7eb; margin: 0 0 32px 0; }
-  .table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
-  .table th { text-align: left; font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; padding: 14px 0; border-bottom: 2px solid #e5e7eb; }
-  .table th:last-child { text-align: right; }
-  .table td { padding: 20px 0; font-size: 15px; color: #374151; }
-  .table td:last-child { text-align: right; }
-  .table .amount { font-weight: 700; font-size: 16px; color: #1f2937; }
-  .total-row td { padding-top: 20px; border-top: 2px solid #e5e7eb; }
-  .total-row .amount { font-size: 20px; font-weight: 800; color: #1f2937; }
-  .footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; }
-  .footer p { font-size: 12px; color: #9ca3af; line-height: 1.6; }
-  .footer .brand { font-weight: 700; color: #6b7280; }
-  @media print { body { padding: 40px; } @page { margin: 0.5in; } }
-</style></head><body>
-<div class="header">
-  <img src="/logo.png" class="logo" alt="Join Swimming" />
-  <div class="header-right">
-    <div class="invoice-title">INVOICE</div>
-    <div class="invoice-no">${invoiceNo}</div>
-  </div>
-</div>
-<div class="meta">
-  <div class="meta-left">
-    <div class="label">Diterbitkan untuk</div>
-    <div class="value">${studentName}</div>
-  </div>
-  <div class="meta-right">
-    <div class="label">Tanggal Pembayaran</div>
-    <div class="value">${paidDate}</div>
-  </div>
-</div>
-<div class="paid-row"><span class="paid-badge">LUNAS</span></div>
-<div class="divider"></div>
-<table class="table">
-  <thead><tr><th>Deskripsi</th><th>Jumlah</th></tr></thead>
-  <tbody>
-    <tr>
-      <td>${sessionLabel}</td>
-      <td class="amount">${amount}</td>
-    </tr>
-    <tr class="total-row">
-      <td><strong>Total</strong></td>
-      <td class="amount">${amount}</td>
-    </tr>
-  </tbody>
-</table>
-<div class="footer">
-  <p><span class="brand">Join Swimming</span><br>Terima kasih atas pembayarannya!</p>
-</div>
-</body></html>`;
-
-    const w = window.open("", "_blank");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-      // ponytail: let user Cmd+P / save as PDF from the new tab
-      setTimeout(() => w.print(), 300);
-    }
+    openInvoice({
+      id: pkg.id,
+      studentName: pkg.students?.full_name ?? "-",
+      isPrivate: pkg.sessions?.every((s: any) => s.slot_id === null),
+      totalSessions: pkg.total_sessions,
+      amount: pkg.amount,
+      paidAt: pkg.paid_at,
+    });
   }
 
   const filteredPackages = packages

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, XCircle, Clock, Calendar, CreditCard, Bell } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Calendar, CreditCard, Bell, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import PageTransition from "@/components/layout/PageTransition";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
@@ -10,7 +11,6 @@ import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { markAttendance } from "@/lib/actions/attendance";
 import { approveReschedule, rejectReschedule } from "@/lib/actions/reschedule";
-import { markAsPaid } from "@/lib/actions/payments";
 import { formatTime } from "@/lib/utils";
 
 const stagger = {
@@ -28,8 +28,6 @@ export default function AdminDashboard() {
   const [tomorrowSessions, setTomorrowSessions] = useState<any[]>([]);
   const [overdueSessions, setOverdueSessions] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
-  const [allPackages, setAllPackages] = useState<any[]>([]);
-  const [payFilter, setPayFilter] = useState<"unpaid" | "paid" | "all">("unpaid");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -43,7 +41,7 @@ export default function AdminDashboard() {
       const today = new Date().toISOString().split("T")[0];
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
-      const [sessionsRes, tomorrowRes, overdueRes, requestsRes, packagesRes] = await Promise.all([
+      const [sessionsRes, tomorrowRes, overdueRes, requestsRes] = await Promise.all([
         supabase
           .from("sessions")
           .select("*, students(full_name, phone)")
@@ -68,18 +66,12 @@ export default function AdminDashboard() {
           .select("*, students(full_name), sessions(scheduled_date, start_time, end_time, slot_id)")
           .eq("status", "pending")
           .order("created_at", { ascending: false }),
-        supabase
-          .from("packages")
-          .select("*, students(full_name)")
-          .order("is_paid", { ascending: true })
-          .order("created_at", { ascending: false }),
       ]);
 
       setTodaySessions(sessionsRes.data ?? []);
       setTomorrowSessions(tomorrowRes.data ?? []);
       setOverdueSessions(overdueRes.data ?? []);
       setPendingRequests(requestsRes.data ?? []);
-      setAllPackages(packagesRes.data ?? []);
     } catch {
       // silent
     } finally {
@@ -348,90 +340,21 @@ export default function AdminDashboard() {
 
         {/* Pembayaran */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <CreditCard size={16} className="text-brand-600" />
-            <h2 className="text-sm font-bold text-gray-700">Pembayaran</h2>
-          </div>
-          <div className="flex gap-2 mb-3">
-            {[
-              { key: "unpaid", label: "Belum Lunas" },
-              { key: "paid", label: "Lunas" },
-              { key: "all", label: "Semua" },
-            ].map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setPayFilter(f.key as typeof payFilter)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                  payFilter === f.key ? "bg-brand-600 text-white" : "bg-white text-gray-500 border border-gray-100"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
-            {(() => {
-              const filtered = allPackages.filter((pkg) => {
-                if (payFilter === "unpaid") return !pkg.is_paid;
-                if (payFilter === "paid") return pkg.is_paid;
-                return true;
-              });
-              if (filtered.length === 0) {
-                return (
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-8">
-                    <p className="text-sm text-gray-400">
-                      {payFilter === "unpaid" ? "Semua pembayaran lunas" : "Tidak ada data"}
-                    </p>
-                  </div>
-                );
-              }
-              return filtered.map((pkg: any) => (
-                <motion.div key={pkg.id} variants={item} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar name={pkg.students?.full_name ?? ""} size="sm" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">{pkg.students?.full_name}</p>
-                        <p className="text-xs text-gray-400 font-medium">
-                          {pkg.session_type === "trial" ? "Trial" : "Paket"} · Rp{pkg.amount?.toLocaleString("id-ID")}
-                        </p>
-                      </div>
-                    </div>
-                    {pkg.is_paid ? (
-                      <button
-                        onClick={async () => {
-                          setActionLoading(pkg.id);
-                          try {
-                            const supabase = createClient();
-                            await supabase.from("packages").update({ is_paid: false, paid_at: null } as Record<string, unknown>).eq("id", pkg.id);
-                            fetchData();
-                          } finally { setActionLoading(null); }
-                        }}
-                        disabled={actionLoading === pkg.id}
-                        className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                      >
-                        Lunas
-                      </button>
-                    ) : (
-                      <button
-                        onClick={async () => {
-                          setActionLoading(pkg.id);
-                          try {
-                            await markAsPaid(pkg.id, pkg.amount);
-                            fetchData();
-                          } finally { setActionLoading(null); }
-                        }}
-                        disabled={actionLoading === pkg.id}
-                        className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-100 hover:bg-amber-100 transition-colors disabled:opacity-50"
-                      >
-                        Belum Lunas
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              ));
-            })()}
-          </motion.div>
+          <Link
+            href="/admin/payments"
+            className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center">
+                <CreditCard size={18} className="text-brand-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">Kelola Pembayaran</p>
+                <p className="text-xs text-gray-400 font-medium">Lihat status & unduh invoice</p>
+              </div>
+            </div>
+            <ChevronRight size={20} className="text-gray-300" />
+          </Link>
         </section>
       </div>
     </PageTransition>

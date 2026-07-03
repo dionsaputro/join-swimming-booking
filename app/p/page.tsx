@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Droplets, ChevronLeft, ChevronRight, Clock, Users } from "lucide-react";
+import { Droplets, ChevronLeft, ChevronRight, Clock, Users, Download } from "lucide-react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import { openInvoice } from "@/lib/invoice";
 import { formatTime, anonymizeName } from "@/lib/utils";
 import { DAYS_SHORT, SESSION_STATUS } from "@/lib/constants";
 import Badge from "@/components/ui/Badge";
@@ -219,23 +220,43 @@ export default function StudentPortal() {
               {packages.length > 0 && (
                 <div className="space-y-2">
                   <h2 className="text-sm font-bold text-gray-700">Status Pembayaran</h2>
-                  {packages.slice(0, 3).map((pkg: any) => (
+                  {packages.slice(0, 3).map((pkg: any) => {
+                    const pkgSessions = sessions.filter((s: any) => s.package_id === pkg.id);
+                    const isPrivate = pkgSessions.length > 0 && pkgSessions.every((s: any) => s.slot_id === null);
+                    return (
                     <div key={pkg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-gray-800">
-                          {pkg.session_type === "trial" ? "Trial" : "Paket"} · Rp{pkg.amount?.toLocaleString("id-ID")}
+                          {isPrivate ? "Private" : "Group"} Renang ({pkg.total_sessions}) · Rp{pkg.amount?.toLocaleString("id-ID")}
                         </p>
                         <p className="text-xs text-gray-400">
                           {new Date(pkg.start_date).toLocaleDateString("id-ID", { day: "numeric", month: "short" })} – {new Date(pkg.end_date).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
                         </p>
                       </div>
                       {pkg.is_paid ? (
-                        <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">Lunas</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => openInvoice({
+                              id: pkg.id,
+                              studentName: student?.full_name ?? "-",
+                              isPrivate,
+                              totalSessions: pkg.total_sessions,
+                              amount: pkg.amount,
+                              paidAt: pkg.paid_at,
+                            })}
+                            className="w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors"
+                            title="Download Invoice"
+                          >
+                            <Download size={14} className="text-gray-500" />
+                          </button>
+                          <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">Lunas</span>
+                        </div>
                       ) : (
                         <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">Belum Lunas</span>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
