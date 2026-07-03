@@ -11,7 +11,6 @@ import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { markAsPaid } from "@/lib/actions/payments";
-import { SESSION_TYPE_LABELS } from "@/lib/constants";
 
 const stagger = {
   hidden: { opacity: 0 },
@@ -35,7 +34,7 @@ export default function PaymentsPage() {
   const [payAmount, setPayAmount] = useState(0);
   const [payDate, setPayDate] = useState("");
   const [payStudentName, setPayStudentName] = useState("");
-  const [paySessionType, setPaySessionType] = useState("");
+  const [payLabel, setPayLabel] = useState("");
 
   useEffect(() => {
     fetchPackages();
@@ -46,7 +45,7 @@ export default function PaymentsPage() {
       const supabase = createClient();
       const { data } = await supabase
         .from("packages")
-        .select("*, students(full_name)")
+        .select("*, students(full_name), sessions(slot_id)")
         .order("is_paid", { ascending: true })
         .order("created_at", { ascending: false });
       setPackages(data ?? []);
@@ -61,7 +60,10 @@ export default function PaymentsPage() {
     setPayPkgId(pkg.id);
     setPayAmount(pkg.amount);
     setPayStudentName(pkg.students?.full_name ?? "");
-    setPaySessionType(pkg.session_type);
+    const isPrivate = pkg.sessions?.every((s: any) => s.slot_id === null);
+    setPayLabel(isPrivate
+      ? `Private Renang (${pkg.total_sessions}) pertemuan`
+      : `Group Renang (${pkg.total_sessions}) pertemuan`);
     setPayDate(new Date().toISOString().split("T")[0]);
     setShowPayModal(true);
   }
@@ -85,7 +87,10 @@ export default function PaymentsPage() {
       : "-";
     const createdDate = new Date(pkg.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
     const studentName = pkg.students?.full_name ?? "-";
-    const sessionType = SESSION_TYPE_LABELS[pkg.session_type] || pkg.session_type;
+    const isPrivate = pkg.sessions?.every((s: any) => s.slot_id === null);
+    const sessionLabel = isPrivate
+      ? `Private Renang (${pkg.total_sessions}) pertemuan`
+      : `Group Renang (${pkg.total_sessions}) pertemuan`;
     const amount = `Rp${pkg.amount.toLocaleString("id-ID")}`;
     const invoiceNo = `INV-${pkg.id.slice(0, 8).toUpperCase()}`;
 
@@ -145,7 +150,7 @@ export default function PaymentsPage() {
   <tbody>
     <tr>
       <td>
-        ${sessionType}
+        ${sessionLabel}
         <div class="desc-sub">Paket dibuat ${createdDate}</div>
       </td>
       <td class="amount">${amount}</td>
@@ -237,7 +242,9 @@ export default function PaymentsPage() {
                       <p className="text-sm font-semibold text-gray-800">{pkg.students?.full_name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-gray-400 font-medium">
-                          {SESSION_TYPE_LABELS[pkg.session_type]}
+                          {pkg.sessions?.every((s: any) => s.slot_id === null)
+                            ? `Private Renang (${pkg.total_sessions}) pertemuan`
+                            : `Group Renang (${pkg.total_sessions}) pertemuan`}
                         </span>
                         <span className="text-xs font-bold text-gray-700">
                           Rp{pkg.amount.toLocaleString("id-ID")}
@@ -285,7 +292,7 @@ export default function PaymentsPage() {
       <Modal isOpen={showPayModal} onClose={() => setShowPayModal(false)} title="Tandai Lunas">
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            <span className="font-bold">{payStudentName}</span> — {SESSION_TYPE_LABELS[paySessionType] || paySessionType}
+            <span className="font-bold">{payStudentName}</span> — {payLabel}
           </p>
           <p className="text-lg font-bold text-gray-900">Rp{payAmount.toLocaleString("id-ID")}</p>
           <Input
