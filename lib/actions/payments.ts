@@ -22,13 +22,13 @@ export async function getPayments(filter?: "paid" | "unpaid") {
   return data;
 }
 
-export async function markAsPaid(packageId: string, amount: number) {
+export async function markAsPaid(packageId: string, amount: number, paidAt?: string) {
   const supabase = createClient();
   const { error } = await supabase
     .from("packages")
     .update({
       is_paid: true,
-      paid_at: new Date().toISOString(),
+      paid_at: paidAt || new Date().toISOString(),
       amount,
     })
     .eq("id", packageId);

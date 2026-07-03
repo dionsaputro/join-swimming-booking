@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Check } from "lucide-react";
+import { Check, Download } from "lucide-react";
 import PageTransition from "@/components/layout/PageTransition";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { markAsPaid } from "@/lib/actions/payments";
@@ -27,6 +29,14 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Payment modal
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [payPkgId, setPayPkgId] = useState("");
+  const [payAmount, setPayAmount] = useState(0);
+  const [payDate, setPayDate] = useState("");
+  const [payStudentName, setPayStudentName] = useState("");
+  const [paySessionType, setPaySessionType] = useState("");
+
   useEffect(() => {
     fetchPackages();
   }, []);
@@ -47,15 +57,92 @@ export default function PaymentsPage() {
     }
   }
 
-  async function handleMarkPaid(packageId: string, amount: number) {
-    setActionLoading(packageId);
+  function openPayModal(pkg: any) {
+    setPayPkgId(pkg.id);
+    setPayAmount(pkg.amount);
+    setPayStudentName(pkg.students?.full_name ?? "");
+    setPaySessionType(pkg.session_type);
+    setPayDate(new Date().toISOString().split("T")[0]);
+    setShowPayModal(true);
+  }
+
+  async function handleConfirmPay() {
+    setShowPayModal(false);
+    setActionLoading(payPkgId);
     try {
-      await markAsPaid(packageId, amount);
+      await markAsPaid(payPkgId, payAmount, new Date(payDate + "T00:00:00").toISOString());
       await fetchPackages();
     } catch {
       // silent
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  function downloadInvoice(pkg: any) {
+    const paidDate = pkg.paid_at
+      ? new Date(pkg.paid_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+      : "-";
+    const createdDate = new Date(pkg.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    const studentName = pkg.students?.full_name ?? "-";
+    const sessionType = SESSION_TYPE_LABELS[pkg.session_type] || pkg.session_type;
+    const amount = `Rp${pkg.amount.toLocaleString("id-ID")}`;
+    const invoiceNo = `INV-${pkg.id.slice(0, 8).toUpperCase()}`;
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Invoice ${invoiceNo}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 48px; color: #1a1a1a; max-width: 600px; margin: 0 auto; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 48px; }
+  .logo { height: 48px; }
+  .invoice-title { font-size: 24px; font-weight: 700; color: #374151; }
+  .invoice-no { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+  .section { margin-bottom: 32px; }
+  .label { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .value { font-size: 14px; color: #374151; }
+  .table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  .table th { text-align: left; font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+  .table td { padding: 16px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; }
+  .table .amount { text-align: right; font-weight: 700; font-size: 16px; }
+  .total-row td { border-bottom: none; padding-top: 16px; }
+  .total-row .amount { font-size: 20px; color: #059669; }
+  .footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center; }
+  .paid-badge { display: inline-block; background: #ecfdf5; color: #059669; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 8px; border: 1px solid #d1fae5; }
+  @media print { body { padding: 24px; } }
+</style></head><body>
+<div class="header">
+  <img src="/logo.png" class="logo" alt="Join Swimming" />
+  <div style="text-align: right;">
+    <div class="invoice-title">Invoice</div>
+    <div class="invoice-no">${invoiceNo}</div>
+  </div>
+</div>
+<div class="section">
+  <div class="label">Diterbitkan untuk</div>
+  <div class="value">${studentName}</div>
+</div>
+<div class="section">
+  <div class="label">Tanggal Bayar</div>
+  <div class="value">${paidDate}</div>
+</div>
+<table class="table">
+  <thead><tr><th>Deskripsi</th><th style="text-align:right">Jumlah</th></tr></thead>
+  <tbody>
+    <tr><td>${sessionType}<br><span style="font-size:12px;color:#9ca3af">Paket dibuat ${createdDate}</span></td><td class="amount">${amount}</td></tr>
+    <tr class="total-row"><td><strong>Total</strong></td><td class="amount">${amount}</td></tr>
+  </tbody>
+</table>
+<div style="text-align:right"><span class="paid-badge">LUNAS</span></div>
+<div class="footer">Join Swimming &middot; Terima kasih!</div>
+</body></html>`;
+
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      // ponytail: let user Cmd+P / save as PDF from the new tab
+      setTimeout(() => w.print(), 300);
     }
   }
 
@@ -132,14 +219,23 @@ export default function PaymentsPage() {
                     </div>
                   </div>
                   {pkg.is_paid ? (
-                    <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
-                      Lunas
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => downloadInvoice(pkg)}
+                        className="w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors"
+                        title="Download Invoice"
+                      >
+                        <Download size={14} className="text-gray-500" />
+                      </button>
+                      <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                        Lunas
+                      </span>
+                    </div>
                   ) : (
                     <Button
                       size="sm"
                       variant="primary"
-                      onClick={() => handleMarkPaid(pkg.id, pkg.amount)}
+                      onClick={() => openPayModal(pkg)}
                       isLoading={actionLoading === pkg.id}
                     >
                       <Check size={14} />
@@ -157,6 +253,25 @@ export default function PaymentsPage() {
           )}
         </motion.div>
       </div>
+
+      {/* Pay Confirmation Modal */}
+      <Modal isOpen={showPayModal} onClose={() => setShowPayModal(false)} title="Tandai Lunas">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            <span className="font-bold">{payStudentName}</span> — {SESSION_TYPE_LABELS[paySessionType] || paySessionType}
+          </p>
+          <p className="text-lg font-bold text-gray-900">Rp{payAmount.toLocaleString("id-ID")}</p>
+          <Input
+            label="Tanggal Pembayaran"
+            type="date"
+            value={payDate}
+            onChange={(e) => setPayDate(e.target.value)}
+          />
+          <Button className="w-full" onClick={handleConfirmPay}>
+            Konfirmasi Lunas
+          </Button>
+        </div>
+      </Modal>
     </PageTransition>
   );
 }
