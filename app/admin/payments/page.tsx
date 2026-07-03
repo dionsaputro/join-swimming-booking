@@ -85,7 +85,6 @@ export default function PaymentsPage() {
     const paidDate = pkg.paid_at
       ? new Date(pkg.paid_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
       : "-";
-    const createdDate = new Date(pkg.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
     const studentName = pkg.students?.full_name ?? "-";
     const isPrivate = pkg.sessions?.every((s: any) => s.slot_id === null);
     const sessionLabel = isPrivate
@@ -99,30 +98,28 @@ export default function PaymentsPage() {
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 60px; color: #1a1a1a; max-width: 720px; margin: 0 auto; }
-  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 56px; padding-bottom: 32px; border-bottom: 2px solid #f3f4f6; }
+  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 48px; padding-bottom: 32px; border-bottom: 2px solid #f3f4f6; }
   .logo { height: 72px; width: auto; }
   .header-right { text-align: right; }
   .invoice-title { font-size: 32px; font-weight: 800; color: #111827; letter-spacing: -0.02em; }
   .invoice-no { font-size: 13px; color: #6b7280; margin-top: 6px; font-weight: 500; }
-  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 48px; }
-  .meta-block {}
+  .meta { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .meta-left {}
+  .meta-right { text-align: right; }
   .label { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
   .value { font-size: 15px; color: #1f2937; font-weight: 500; line-height: 1.5; }
+  .paid-row { text-align: right; margin-bottom: 48px; }
+  .paid-badge { display: inline-block; background: #ecfdf5; color: #059669; font-size: 12px; font-weight: 800; padding: 6px 16px; border-radius: 10px; border: 1.5px solid #a7f3d0; letter-spacing: 0.04em; }
   .divider { height: 1px; background: #e5e7eb; margin: 0 0 32px 0; }
-  .table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+  .table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
   .table th { text-align: left; font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; padding: 14px 0; border-bottom: 2px solid #e5e7eb; }
   .table th:last-child { text-align: right; }
-  .table td { padding: 20px 0; border-bottom: 1px solid #f3f4f6; font-size: 15px; color: #374151; }
+  .table td { padding: 20px 0; font-size: 15px; color: #374151; }
   .table td:last-child { text-align: right; }
-  .table .desc-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; }
   .table .amount { font-weight: 700; font-size: 16px; color: #1f2937; }
-  .total-section { display: flex; justify-content: flex-end; margin-bottom: 40px; }
-  .total-box { background: #f9fafb; border-radius: 16px; padding: 20px 32px; text-align: right; border: 1px solid #e5e7eb; }
-  .total-label { font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
-  .total-amount { font-size: 28px; font-weight: 800; color: #059669; }
-  .status { text-align: right; margin-bottom: 48px; }
-  .paid-badge { display: inline-block; background: #ecfdf5; color: #059669; font-size: 13px; font-weight: 800; padding: 8px 20px; border-radius: 12px; border: 1.5px solid #a7f3d0; letter-spacing: 0.05em; }
-  .footer { padding-top: 32px; border-top: 1px solid #e5e7eb; text-align: center; }
+  .total-row td { padding-top: 20px; border-top: 2px solid #e5e7eb; }
+  .total-row .amount { font-size: 20px; font-weight: 800; color: #1f2937; }
+  .footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; }
   .footer p { font-size: 12px; color: #9ca3af; line-height: 1.6; }
   .footer .brand { font-weight: 700; color: #6b7280; }
   @media print { body { padding: 40px; } @page { margin: 0.5in; } }
@@ -135,35 +132,30 @@ export default function PaymentsPage() {
   </div>
 </div>
 <div class="meta">
-  <div class="meta-block">
+  <div class="meta-left">
     <div class="label">Diterbitkan untuk</div>
     <div class="value">${studentName}</div>
   </div>
-  <div class="meta-block">
+  <div class="meta-right">
     <div class="label">Tanggal Pembayaran</div>
     <div class="value">${paidDate}</div>
   </div>
 </div>
+<div class="paid-row"><span class="paid-badge">LUNAS</span></div>
 <div class="divider"></div>
 <table class="table">
   <thead><tr><th>Deskripsi</th><th>Jumlah</th></tr></thead>
   <tbody>
     <tr>
-      <td>
-        ${sessionLabel}
-        <div class="desc-sub">Paket dibuat ${createdDate}</div>
-      </td>
+      <td>${sessionLabel}</td>
+      <td class="amount">${amount}</td>
+    </tr>
+    <tr class="total-row">
+      <td><strong>Total</strong></td>
       <td class="amount">${amount}</td>
     </tr>
   </tbody>
 </table>
-<div class="total-section">
-  <div class="total-box">
-    <div class="total-label">Total</div>
-    <div class="total-amount">${amount}</div>
-  </div>
-</div>
-<div class="status"><span class="paid-badge">LUNAS</span></div>
 <div class="footer">
   <p><span class="brand">Join Swimming</span><br>Terima kasih atas pembayarannya!</p>
 </div>
