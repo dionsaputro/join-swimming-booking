@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Check, Download } from "lucide-react";
+import { Check, Download, Search } from "lucide-react";
 import PageTransition from "@/components/layout/PageTransition";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
@@ -25,6 +25,7 @@ const item = {
 
 export default function PaymentsPage() {
   const [filter, setFilter] = useState<"all" | "unpaid" | "paid">("unpaid");
+  const [search, setSearch] = useState("");
   const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -99,6 +100,9 @@ export default function PaymentsPage() {
       if (filter === "paid") return pkg.is_paid;
       return true;
     })
+    .filter((pkg) =>
+      (pkg.students?.full_name ?? "").toLowerCase().includes(search.trim().toLowerCase())
+    )
     .sort((a, b) => (a.is_paid === b.is_paid ? 0 : a.is_paid ? 1 : -1));
 
   if (loading) {
@@ -119,6 +123,18 @@ export default function PaymentsPage() {
     <PageTransition>
       <div className="space-y-5">
         <h1 className="font-display text-2xl text-gray-900">Pembayaran</h1>
+
+        {/* Search */}
+        <div className="relative">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama murid..."
+            className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          />
+        </div>
 
         {/* Filter */}
         <div className="flex gap-2">
